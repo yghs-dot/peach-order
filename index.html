@@ -441,15 +441,16 @@
         </select>
         <label class="field">수량</label>
         <input type="number" id="manual-qty" min="1" value="1">
-        <label class="field">이름</label>
+        <div class="notice" style="margin-top:14px;">동+호수 또는 이름 중 <b>최소 한 가지</b>만 입력하면 돼요. (둘 다 입력하셔도 됩니다)</div>
+        <label class="field">이름 (선택)</label>
         <input type="text" id="manual-name" placeholder="홍길동">
         <div class="row2">
           <div>
-            <label class="field">동 (4자리)</label>
+            <label class="field">동 (4자리, 선택)</label>
             <input type="text" id="manual-dong" placeholder="1101" inputmode="numeric" maxlength="4">
           </div>
           <div>
-            <label class="field">호수 (3~4자리)</label>
+            <label class="field">호수 (3~4자리, 선택)</label>
             <input type="text" id="manual-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
           </div>
         </div>
@@ -634,7 +635,7 @@ function renderOrderListHTML(list, showContact){
   return sorted.map(o=>`
     <div class="order-item">
       <div class="info">
-        ${showContact ? `<b>${o.name || '이름없음'} · ${o.dong||'-'}동 ${o.ho||'-'}호 · ${o.phone||'-'}</b><br>` : ''}
+        ${showContact ? `<b>${o.name || '이름없음'} · ${(o.dong && o.ho) ? `${o.dong}동 ${o.ho}호` : '동/호수 입력안함'} · ${o.phone||'-'}</b><br>` : ''}
         ${o.label} × ${o.qty} · ${o.total.toLocaleString()}원<br>
         <span style="color:var(--ink-soft)">주문번호 ${o.id} · ${new Date(o.createdAt).toLocaleString('ko-KR')}</span>
       </div>
@@ -977,9 +978,22 @@ document.getElementById('manual-add').addEventListener('click', async ()=>{
 
   if(!type){ msg.textContent = '박스 종류를 선택해주세요.'; return; }
   if(qty < 1){ msg.textContent = '수량을 1개 이상 입력해주세요.'; return; }
-  if(!name){ msg.textContent = '이름을 입력해주세요.'; return; }
-  if(!/^\d{4}$/.test(dong)){ msg.textContent = '동은 숫자 4자리로 입력해주세요.'; return; }
-  if(!/^\d{3,4}$/.test(ho)){ msg.textContent = '호수는 숫자 3~4자리로 입력해주세요.'; return; }
+
+  const hasName = !!name;
+  const dongFilled = dong.length > 0;
+  const hoFilled = ho.length > 0;
+
+  if(hasName){
+    // 이름이 있으면 동/호수는 선택사항. 다만 입력했다면 형식은 맞아야 함
+    if(dongFilled && !/^\d{4}$/.test(dong)){ msg.textContent = '동은 숫자 4자리로 입력해주세요.'; return; }
+    if(hoFilled && !/^\d{3,4}$/.test(ho)){ msg.textContent = '호수는 숫자 3~4자리로 입력해주세요.'; return; }
+  }else{
+    // 이름이 없으면 동+호수가 정확히 입력되어 있어야 함
+    if(!/^\d{4}$/.test(dong) || !/^\d{3,4}$/.test(ho)){
+      msg.textContent = '동+호수 또는 이름 중 하나는 반드시 입력해주세요.';
+      return;
+    }
+  }
   if(!phone){ msg.textContent = '연락처를 입력해주세요.'; return; }
 
   const btn = document.getElementById('manual-add');
@@ -1134,7 +1148,7 @@ function renderAdminOrders(){
           <span class="field-tag">이름</span> <b>${o.name || '이름없음'}</b>
         </div>
         <div style="margin-bottom:4px;">
-          <span class="field-tag">동/호수</span> <b>${o.dong}동 ${o.ho}호</b>
+          <span class="field-tag">동/호수</span> <b>${o.dong && o.ho ? `${o.dong}동 ${o.ho}호` : '입력안함'}</b>
         </div>
         <div style="margin-bottom:4px;">
           <span class="field-tag">연락처</span> ${o.phone}
