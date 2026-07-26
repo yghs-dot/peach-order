@@ -100,6 +100,12 @@
     color:var(--coral-dark);
     box-shadow:0 2px 8px rgba(59,42,34,.08);
   }
+  .admin-tab{
+    flex:0 0 auto;
+    padding:9px 14px;
+    font-size:13px;
+  }
+  .admin-subpanel .card:first-child{margin-top:0;}
 
   .panel{display:none;}
   .panel.active{display:block;}
@@ -185,6 +191,36 @@
     font-size:14.5px;
   }
   .summary .total{font-family:'Fraunces',serif;font-weight:700;font-size:22px;color:var(--coral-dark);}
+
+  .stats-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .stat-box{
+    background:#FBF1E6;
+    border-radius:12px;
+    padding:14px 10px;
+    text-align:center;
+  }
+  .stat-box .num{
+    font-family:'Fraunces',serif;
+    font-weight:700;
+    font-size:26px;
+    color:var(--coral-dark);
+    line-height:1.2;
+  }
+  .stat-box .stat-label{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:4px;
+    font-weight:600;
+  }
+  .stats-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .stats-table th, .stats-table td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);}
+  .stats-table th{color:var(--ink-soft);font-weight:700;font-size:12px;}
+  .stats-table td.num-cell{text-align:right;font-weight:700;}
 
   .btn{
     display:inline-block;
@@ -412,138 +448,176 @@
     </div>
 
     <div id="admin-content" style="display:none;">
-      <div class="card">
-        <h2>기존 주문 조회</h2>
-        <div class="sub">이름, 동+호수, 연락처 중 아는 정보만 입력해 조회하세요. 입력한 정보 중 하나라도 일치하는 주문을 모두 모아서 보여드려요.</div>
-        <label class="field">이름</label>
-        <input type="text" id="existing-lookup-name" placeholder="홍길동">
-        <div class="row2">
-          <div>
-            <label class="field">동 (4자리)</label>
-            <input type="text" id="existing-lookup-dong" placeholder="1101" inputmode="numeric" maxlength="4">
-          </div>
-          <div>
-            <label class="field">호수 (3~4자리)</label>
-            <input type="text" id="existing-lookup-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
-          </div>
-        </div>
-        <label class="field">연락처</label>
-        <input type="tel" id="existing-lookup-phone" placeholder="010-1234-5678">
-        <button class="btn btn-outline" id="existing-lookup-btn" type="button">동+호수 · 이름 · 연락처로 조회</button>
-        <div id="existing-lookup-results" style="margin-top:14px;"></div>
+      <div class="tabs" style="flex-wrap:wrap;height:auto;">
+        <div class="admin-tab tab active" data-admin-tab="stats">통계</div>
+        <div class="admin-tab tab" data-admin-tab="lookup">주문 조회</div>
+        <div class="admin-tab tab" data-admin-tab="list">주문 목록</div>
+        <div class="admin-tab tab" data-admin-tab="register">주문 등록</div>
+        <div class="admin-tab tab" data-admin-tab="fix">데이터 정정</div>
+        <div class="admin-tab tab" data-admin-tab="pw">비밀번호</div>
+        <div class="admin-tab tab" data-admin-tab="products">상품 관리</div>
       </div>
 
-      <div class="card">
-        <h2>주문 목록 · 주문 조회</h2>
-        <div class="sub">아래는 전체 주문 목록이에요. 특정 주문자를 찾고 싶으면 원하는 정보만 입력해 검색할 수 있고, 입력 없이 바로 전체 목록을 볼 수도 있어요.</div>
-
-        <label class="field">이름</label>
-        <input type="text" id="admin-search-name" placeholder="홍길동">
-        <div class="row2">
-          <div>
-            <label class="field">동</label>
-            <input type="text" id="admin-search-dong" placeholder="1101" inputmode="numeric" maxlength="4">
-          </div>
-          <div>
-            <label class="field">호수</label>
-            <input type="text" id="admin-search-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
-          </div>
+      <div class="admin-subpanel" id="admin-sub-stats" style="display:block;">
+        <div class="card">
+          <h2>주문 통계</h2>
+          <div class="sub">전체 주문 현황을 한눈에 확인하세요. 목록이나 검색 결과와 무관하게 항상 전체 기준으로 집계돼요.</div>
+          <div id="admin-stats"></div>
         </div>
-        <label class="field">연락처</label>
-        <input type="tel" id="admin-search-phone" placeholder="010-1234-5678">
-        <div style="display:flex;gap:8px;margin-top:14px;">
-          <button class="btn btn-primary" id="admin-search-btn" type="button" style="flex:1;">주문 조회</button>
-          <button class="btn btn-outline" id="admin-search-reset" type="button" style="flex:1;">전체 보기</button>
-        </div>
-
-        <div class="divider"></div>
-        <button class="btn btn-outline" id="export-excel" style="margin-bottom:16px;">📊 엑셀 파일로 내려받기</button>
-        <div id="admin-orders"></div>
       </div>
 
-      <div class="card">
-        <h2>주문 직접 등록</h2>
-        <div class="sub">전화·문자 등으로 이미 받은 주문을 여기에 입력하면 재고에서 자동으로 차감되고 주문 목록에 함께 표시돼요.</div>
-        <label class="field">박스 종류</label>
-        <select id="manual-type">
-          <option value="">선택해주세요</option>
-        </select>
-        <label class="field">수량</label>
-        <input type="number" id="manual-qty" min="1" value="1">
-        <div class="notice" style="margin-top:14px;">동+호수 또는 이름 중 <b>최소 한 가지</b>만 입력하면 돼요. (둘 다 입력하셔도 됩니다)<br>단, <b>동+호수를 입력하면 연락처는 필수</b>이고, 이름만으로 등록할 때는 연락처가 선택사항이에요.</div>
-        <label class="field">이름 (선택)</label>
-        <input type="text" id="manual-name" placeholder="홍길동">
-        <div class="row2">
-          <div>
-            <label class="field">동 (4자리, 선택)</label>
-            <input type="text" id="manual-dong" placeholder="1101" inputmode="numeric" maxlength="4">
+      <div class="admin-subpanel" id="admin-sub-lookup" style="display:none;">
+        <div class="card">
+          <h2>기존 주문 조회</h2>
+          <div class="sub">이름, 동+호수, 연락처 중 아는 정보만 입력해 조회하세요. 입력한 정보 중 하나라도 일치하는 주문을 모두 모아서 보여드려요.</div>
+          <label class="field">이름</label>
+          <input type="text" id="existing-lookup-name" placeholder="홍길동">
+          <div class="row2">
+            <div>
+              <label class="field">동 (4자리)</label>
+              <input type="text" id="existing-lookup-dong" placeholder="1101" inputmode="numeric" maxlength="4">
+            </div>
+            <div>
+              <label class="field">호수 (3~4자리)</label>
+              <input type="text" id="existing-lookup-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
+            </div>
           </div>
-          <div>
-            <label class="field">호수 (3~4자리, 선택)</label>
-            <input type="text" id="manual-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
-          </div>
+          <label class="field">연락처</label>
+          <input type="tel" id="existing-lookup-phone" placeholder="010-1234-5678">
+          <button class="btn btn-outline" id="existing-lookup-btn" type="button">동+호수 · 이름 · 연락처로 조회</button>
+          <div id="existing-lookup-results" style="margin-top:14px;"></div>
         </div>
-        <label class="field">연락처 (동+호수 입력 시 필수)</label>
-        <input type="tel" id="manual-phone" placeholder="010-1234-5678">
-        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:700;font-size:13.5px;cursor:pointer;">
-          <input type="checkbox" id="manual-confirmed" style="width:auto;">
-          입금 확인 완료된 주문이에요
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:700;font-size:13.5px;cursor:pointer;">
-          <input type="checkbox" id="manual-delivered" style="width:auto;">
-          이미 전달(발송) 완료된 주문이에요
-        </label>
-        <button class="btn btn-primary" id="manual-add">주문 등록하기</button>
-        <div class="small-note" id="manual-msg"></div>
       </div>
 
-      <div class="card">
-        <h2>주문 데이터 정정</h2>
-        <div class="sub">이미 접수된 주문에 저장된 상품명에 오타가 있을 때, 여기서 한 번에 고칠 수 있어요. (상품 관리에서 이름을 바꿔도 과거 주문에는 반영되지 않기 때문에 이 도구가 필요해요.)</div>
-        <label class="field">기존 상품명 (오타가 있는 텍스트)</label>
-        <input type="text" id="fix-label-old" placeholder="예: 14갭">
-        <label class="field">바꿀 상품명</label>
-        <input type="text" id="fix-label-new" placeholder="예: 14개입">
-        <button class="btn btn-primary" id="fix-label-btn" type="button">일괄 수정 적용</button>
-        <div class="small-note" id="fix-label-msg"></div>
-      </div>
-
-      <div class="card">
-        <h2>관리자 비밀번호 변경</h2>
-        <div class="sub">비밀번호는 관리자 화면 접속에만 사용돼요. 변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</div>
-        <label class="field">현재 비밀번호</label>
-        <input type="password" id="pw-current" placeholder="현재 비밀번호">
-        <label class="field">새 비밀번호</label>
-        <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)">
-        <label class="field">새 비밀번호 확인</label>
-        <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
-        <button class="btn btn-primary" id="save-pw">비밀번호 변경</button>
-        <div class="small-note" id="pw-msg"></div>
-      </div>
-
-      <div class="card">
-        <h2>상품 관리</h2>
-        <div class="sub">판매할 상품을 추가·삭제하고, 각 상품의 이름·가격·재고 수량을 설정하세요. 가격을 바꿔도 이미 접수된 주문의 금액은 변경되지 않아요.</div>
-        <div id="admin-limits"></div>
-
-        <div class="divider"></div>
-        <h2 style="font-size:16px;">새 상품 추가</h2>
-        <label class="field">상품명</label>
-        <input type="text" id="new-product-label" placeholder="예: 14개입">
-        <div class="row2">
-          <div>
-            <label class="field">판매가격 (원)</label>
-            <input type="number" id="new-product-price" min="0" step="100" placeholder="예: 22000">
-          </div>
-          <div>
-            <label class="field">총 판매수량</label>
-            <input type="number" id="new-product-limit" min="0" placeholder="예: 20">
-          </div>
+      <div class="admin-subpanel" id="admin-sub-list" style="display:none;">
+        <div class="card">
+          <h2>상품갯수별 총 갯수 통계</h2>
+          <div id="qty-stats-list"></div>
         </div>
-        <button class="btn btn-outline" id="add-product" type="button">+ 상품 목록에 추가</button>
-        <div class="small-note" id="add-product-msg"></div>
+        <div class="card">
+          <h2>주문 목록 · 주문 조회</h2>
+          <div class="sub">아래는 전체 주문 목록이에요. 특정 주문자를 찾고 싶으면 원하는 정보만 입력해 검색할 수 있고, 입력 없이 바로 전체 목록을 볼 수도 있어요.</div>
 
-        <button class="btn btn-primary" id="save-limits" style="margin-top:20px;">상품 정보 저장</button>
+          <label class="field">이름</label>
+          <input type="text" id="admin-search-name" placeholder="홍길동">
+          <div class="row2">
+            <div>
+              <label class="field">동</label>
+              <input type="text" id="admin-search-dong" placeholder="1101" inputmode="numeric" maxlength="4">
+            </div>
+            <div>
+              <label class="field">호수</label>
+              <input type="text" id="admin-search-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
+            </div>
+          </div>
+          <label class="field">연락처</label>
+          <input type="tel" id="admin-search-phone" placeholder="010-1234-5678">
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn btn-primary" id="admin-search-btn" type="button" style="flex:1;">주문 조회</button>
+            <button class="btn btn-outline" id="admin-search-reset" type="button" style="flex:1;">전체 보기</button>
+          </div>
+
+          <div class="divider"></div>
+          <button class="btn btn-outline" id="export-excel" style="margin-bottom:16px;">📊 엑셀 파일로 내려받기</button>
+          <div id="admin-orders"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-register" style="display:none;">
+        <div class="card">
+          <h2>상품갯수별 총 갯수 통계</h2>
+          <div id="qty-stats-register"></div>
+        </div>
+        <div class="card">
+          <h2>주문 직접 등록</h2>
+          <div class="sub">전화·문자 등으로 이미 받은 주문을 여기에 입력하면 재고에서 자동으로 차감되고 주문 목록에 함께 표시돼요.</div>
+          <label class="field">박스 종류</label>
+          <select id="manual-type">
+            <option value="">선택해주세요</option>
+          </select>
+          <label class="field">수량</label>
+          <input type="number" id="manual-qty" min="1" value="1">
+          <div class="notice" style="margin-top:14px;">동+호수 또는 이름 중 <b>최소 한 가지</b>만 입력하면 돼요. (둘 다 입력하셔도 됩니다)<br>단, <b>동+호수를 입력하면 연락처는 필수</b>이고, 이름만으로 등록할 때는 연락처가 선택사항이에요.</div>
+          <label class="field">이름 (선택)</label>
+          <input type="text" id="manual-name" placeholder="홍길동">
+          <div class="row2">
+            <div>
+              <label class="field">동 (4자리, 선택)</label>
+              <input type="text" id="manual-dong" placeholder="1101" inputmode="numeric" maxlength="4">
+            </div>
+            <div>
+              <label class="field">호수 (3~4자리, 선택)</label>
+              <input type="text" id="manual-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
+            </div>
+          </div>
+          <label class="field">연락처 (동+호수 입력 시 필수)</label>
+          <input type="tel" id="manual-phone" placeholder="010-1234-5678">
+          <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:700;font-size:13.5px;cursor:pointer;">
+            <input type="checkbox" id="manual-confirmed" style="width:auto;">
+            입금 확인 완료된 주문이에요
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:700;font-size:13.5px;cursor:pointer;">
+            <input type="checkbox" id="manual-delivered" style="width:auto;">
+            이미 전달(발송) 완료된 주문이에요
+          </label>
+          <button class="btn btn-primary" id="manual-add">주문 등록하기</button>
+          <div class="small-note" id="manual-msg"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-fix" style="display:none;">
+        <div class="card">
+          <h2>주문 데이터 정정</h2>
+          <div class="sub">이미 접수된 주문에 저장된 상품명에 오타가 있을 때, 여기서 한 번에 고칠 수 있어요. (상품 관리에서 이름을 바꿔도 과거 주문에는 반영되지 않기 때문에 이 도구가 필요해요.)</div>
+          <label class="field">기존 상품명 (오타가 있는 텍스트)</label>
+          <input type="text" id="fix-label-old" placeholder="예: 14갭">
+          <label class="field">바꿀 상품명</label>
+          <input type="text" id="fix-label-new" placeholder="예: 14개입">
+          <button class="btn btn-primary" id="fix-label-btn" type="button">일괄 수정 적용</button>
+          <div class="small-note" id="fix-label-msg"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-pw" style="display:none;">
+        <div class="card">
+          <h2>관리자 비밀번호 변경</h2>
+          <div class="sub">비밀번호는 관리자 화면 접속에만 사용돼요. 변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</div>
+          <label class="field">현재 비밀번호</label>
+          <input type="password" id="pw-current" placeholder="현재 비밀번호">
+          <label class="field">새 비밀번호</label>
+          <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)">
+          <label class="field">새 비밀번호 확인</label>
+          <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
+          <button class="btn btn-primary" id="save-pw">비밀번호 변경</button>
+          <div class="small-note" id="pw-msg"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-products" style="display:none;">
+        <div class="card">
+          <h2>상품 관리</h2>
+          <div class="sub">판매할 상품을 추가·삭제하고, 각 상품의 이름·가격·재고 수량을 설정하세요. 가격을 바꿔도 이미 접수된 주문의 금액은 변경되지 않아요.</div>
+          <div id="admin-limits"></div>
+
+          <div class="divider"></div>
+          <h2 style="font-size:16px;">새 상품 추가</h2>
+          <label class="field">상품명</label>
+          <input type="text" id="new-product-label" placeholder="예: 14개입">
+          <div class="row2">
+            <div>
+              <label class="field">판매가격 (원)</label>
+              <input type="number" id="new-product-price" min="0" step="100" placeholder="예: 22000">
+            </div>
+            <div>
+              <label class="field">총 판매수량</label>
+              <input type="number" id="new-product-limit" min="0" placeholder="예: 20">
+            </div>
+          </div>
+          <button class="btn btn-outline" id="add-product" type="button">+ 상품 목록에 추가</button>
+          <div class="small-note" id="add-product-msg"></div>
+
+          <button class="btn btn-primary" id="save-limits" style="margin-top:20px;">상품 정보 저장</button>
+        </div>
       </div>
     </div>
   </div>
@@ -923,6 +997,16 @@ document.querySelectorAll('.tab[data-tab]').forEach(tab=>{
   });
 });
 
+// ADMIN SUB-TABS (통계/주문조회/주문목록/주문등록/데이터정정/비밀번호/상품관리)
+document.querySelectorAll('.admin-tab[data-admin-tab]').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.admin-tab[data-admin-tab]').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.admin-subpanel').forEach(p=>p.style.display='none');
+    tab.classList.add('active');
+    document.getElementById('admin-sub-'+tab.dataset.adminTab).style.display='block';
+  });
+});
+
 // CHECK PANEL - 개인정보 보호를 위해 동+호수와 연락처가 모두 일치해야 조회 가능
 document.getElementById('check-btn').addEventListener('click', async ()=>{
   const results = document.getElementById('check-results');
@@ -1245,6 +1329,8 @@ document.getElementById('save-limits').addEventListener('click', async ()=>{
   renderAdminLimits();
   renderManualTypeOptions();
   renderSlices();
+  renderAdminStats();
+  renderProductQtySummaries();
   toast('상품 정보가 저장되었습니다.');
 });
 
@@ -1388,7 +1474,114 @@ document.getElementById('export-excel').addEventListener('click', async ()=>{
 
 let adminSearchCriteria = null; // null이면 전체 목록, 값이 있으면 검색된 목록만 표시
 
+// "주문 목록" 탭과 "주문 등록" 탭 상단에 공통으로 표시되는 상품별 총 주문갯수 요약
+function renderProductQtySummaries(){
+  const targets = ['qty-stats-list', 'qty-stats-register'].map(id=>document.getElementById(id)).filter(Boolean);
+  if(targets.length === 0) return;
+
+  if(PRODUCTS.length === 0){
+    targets.forEach(el=> el.innerHTML = '<div class="empty">등록된 상품이 없습니다.</div>');
+    return;
+  }
+
+  const rows = PRODUCTS.map(p=>{
+    const qty = orders.filter(o=>o.type===p.key).reduce((s,o)=>s+o.qty,0);
+    return { label:p.label, qty };
+  });
+
+  const html = `
+    <table class="stats-table">
+      <thead><tr><th>상품</th><th style="text-align:right;">총 주문 갯수</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>`<tr><td>${r.label}</td><td class="num-cell">${r.qty}개</td></tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+  targets.forEach(el=> el.innerHTML = html);
+}
+
+function renderAdminStats(){
+  const wrap = document.getElementById('admin-stats');
+  if(!wrap) return;
+
+  const totalOrders = orders.length;
+  const totalQty = orders.reduce((s,o)=>s+o.qty,0);
+  const totalAmount = orders.reduce((s,o)=>s+o.total,0);
+  const confirmedAmount = orders.filter(o=>o.confirmed).reduce((s,o)=>s+o.total,0);
+  const confirmedCount = orders.filter(o=>o.confirmed).length;
+  const pendingCount = totalOrders - confirmedCount;
+  const deliveredCount = orders.filter(o=>o.delivered).length;
+  const notDeliveredCount = totalOrders - deliveredCount;
+
+  if(totalOrders === 0){
+    wrap.innerHTML = '<div class="empty">아직 접수된 주문이 없어 통계를 표시할 수 없습니다.</div>';
+    return;
+  }
+
+  const perProduct = PRODUCTS.map(p=>{
+    const productOrders = orders.filter(o=>o.type===p.key);
+    const qty = productOrders.reduce((s,o)=>s+o.qty,0);
+    const amount = productOrders.reduce((s,o)=>s+o.total,0);
+    const remaining = remainingFor(p.key);
+    return { label:p.label, qty, amount, remaining, limit:p.limit||0 };
+  }).filter(row=>row.qty>0 || row.limit>0);
+
+  wrap.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="num">${totalOrders}건</div>
+        <div class="stat-label">전체 주문 건수</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">${totalQty}개</div>
+        <div class="stat-label">전체 판매 수량</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">${totalAmount.toLocaleString()}원</div>
+        <div class="stat-label">전체 주문 금액</div>
+      </div>
+      <div class="stat-box">
+        <div class="num">${confirmedAmount.toLocaleString()}원</div>
+        <div class="stat-label">입금 확인된 금액</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" style="color:var(--leaf-dark);">${confirmedCount}건</div>
+        <div class="stat-label">입금완료</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" style="color:var(--danger);">${pendingCount}건</div>
+        <div class="stat-label">입금대기</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" style="color:#2C5C99;">${deliveredCount}건</div>
+        <div class="stat-label">전달완료</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" style="color:#8A6D2F;">${notDeliveredCount}건</div>
+        <div class="stat-label">전달대기</div>
+      </div>
+    </div>
+    <table class="stats-table">
+      <thead>
+        <tr><th>상품</th><th style="text-align:right;">판매수량</th><th style="text-align:right;">매출</th><th style="text-align:right;">남은재고</th></tr>
+      </thead>
+      <tbody>
+        ${perProduct.map(row=>`
+          <tr>
+            <td>${row.label}</td>
+            <td class="num-cell">${row.qty}개</td>
+            <td class="num-cell">${row.amount.toLocaleString()}원</td>
+            <td class="num-cell">${row.remaining}개</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
 function renderAdminOrders(){
+  renderAdminStats();
+  renderProductQtySummaries();
   const wrap = document.getElementById('admin-orders');
   const sourceList = adminSearchCriteria ? (findMatchingOrders(adminSearchCriteria) || []) : orders;
 
