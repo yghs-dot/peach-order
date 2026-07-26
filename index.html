@@ -6,8 +6,8 @@
 <title>복숭아 주문</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-firestore-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
@@ -265,6 +265,8 @@
   }
   .status.paid{background:#E4F3E1;color:var(--leaf-dark);}
   .status.pending{background:#FBEAE3;color:var(--danger);}
+  .status.delivered{background:#E5EEFA;color:#2C5C99;}
+  .status.notdelivered{background:#F3EFE4;color:#8A6D2F;}
 
   .empty{
     text-align:center;
@@ -312,7 +314,7 @@
   </div>
   <div class="tabs">
     <div class="tab active" data-tab="order">주문하기</div>
-    <div class="tab" data-tab="check">입금확인 조회</div>
+    <div class="tab" data-tab="check">주문 조회</div>
     <div class="tab" data-tab="admin">관리자</div>
   </div>
 
@@ -337,6 +339,9 @@
         <button type="button" id="qty-plus">+</button>
         <span class="small-note" id="qty-max"></span>
       </div>
+
+      <label class="field">이름</label>
+      <input type="text" id="cust-name" placeholder="홍길동">
 
       <div class="row2">
         <div>
@@ -371,10 +376,36 @@
   <!-- CHECK PANEL -->
   <div class="panel" id="panel-check">
     <div class="card">
-      <h2>입금확인 조회</h2>
-      <div class="sub">주문 시 입력한 연락처로 주문 내역과 입금 확인 여부를 조회할 수 있어요.</div>
-      <label class="field">연락처</label>
-      <input type="tel" id="check-phone" placeholder="010-1234-5678">
+      <h2>주문 조회</h2>
+      <div class="sub">연락처, 동+호수, 이름 중 편한 방법으로 주문 내역과 입금·전달(발송) 여부를 조회할 수 있어요.</div>
+
+      <div class="tabs" style="margin:0 0 16px;">
+        <div class="tab active" data-check-mode="phone">연락처</div>
+        <div class="tab" data-check-mode="dongho">동+호수</div>
+        <div class="tab" data-check-mode="name">이름</div>
+      </div>
+
+      <div id="check-mode-phone">
+        <label class="field">연락처</label>
+        <input type="tel" id="check-phone" placeholder="010-1234-5678">
+      </div>
+      <div id="check-mode-dongho" style="display:none;">
+        <div class="row2">
+          <div>
+            <label class="field">동 (4자리)</label>
+            <input type="text" id="check-dong" placeholder="1101" inputmode="numeric" maxlength="4">
+          </div>
+          <div>
+            <label class="field">호수 (3~4자리)</label>
+            <input type="text" id="check-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
+          </div>
+        </div>
+      </div>
+      <div id="check-mode-name" style="display:none;">
+        <label class="field">이름</label>
+        <input type="text" id="check-name" placeholder="홍길동">
+      </div>
+
       <button class="btn btn-outline" id="check-btn">조회하기</button>
       <div id="check-results" style="margin-top:16px;"></div>
     </div>
@@ -410,6 +441,8 @@
         </select>
         <label class="field">수량</label>
         <input type="number" id="manual-qty" min="1" value="1">
+        <label class="field">이름</label>
+        <input type="text" id="manual-name" placeholder="홍길동">
         <div class="row2">
           <div>
             <label class="field">동 (4자리)</label>
@@ -426,8 +459,18 @@
           <input type="checkbox" id="manual-confirmed" style="width:auto;">
           입금 확인 완료된 주문이에요
         </label>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:700;font-size:13.5px;cursor:pointer;">
+          <input type="checkbox" id="manual-delivered" style="width:auto;">
+          이미 전달(발송) 완료된 주문이에요
+        </label>
         <button class="btn btn-primary" id="manual-add">주문 등록하기</button>
         <div class="small-note" id="manual-msg"></div>
+
+        <div class="divider"></div>
+        <h2 style="font-size:17px;">기존 주문 조회</h2>
+        <div class="sub">위에 입력한 동+호수 또는 이름으로 이 사람이 이미 주문한 내역이 있는지 확인해요.</div>
+        <button class="btn btn-outline" id="manual-lookup" type="button">동+호수 또는 이름으로 조회</button>
+        <div id="manual-lookup-results" style="margin-top:14px;"></div>
       </div>
 
       <div class="card">
@@ -473,7 +516,9 @@ const firebaseConfig = {
 let db = null;
 let firebaseReady = false;
 try{
-  if(firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('여기에')){
+  if(typeof firebase === 'undefined'){
+    console.error('Firebase SDK 스크립트를 불러오지 못했습니다. 네트워크 상태 또는 스크립트 주소를 확인해주세요.');
+  }else if(firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('여기에')){
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
     firebaseReady = true;
@@ -548,6 +593,59 @@ async function loadOrdersOnly(){
   }catch(e){ console.error(e); }
 }
 
+// 검색된 주문 목록을 상품별 갯수 / 입금 상태 / 전달 상태로 요약
+function summarizeOrders(list){
+  const counts = {};
+  PRODUCTS.forEach(p=>{ counts[p.key] = 0; });
+  let confirmedCount = 0;
+  let deliveredCount = 0;
+  list.forEach(o=>{
+    counts[o.type] = (counts[o.type]||0) + o.qty;
+    if(o.confirmed) confirmedCount++;
+    if(o.delivered) deliveredCount++;
+  });
+  const totalQty = list.reduce((s,o)=>s+o.qty,0);
+  const countsText = PRODUCTS.filter(p=>counts[p.key]>0).map(p=>`${p.label} ${counts[p.key]}개`).join(' · ') || '없음';
+  return {
+    countsText, totalQty,
+    confirmedCount,
+    pendingCount: list.length - confirmedCount,
+    deliveredCount,
+    notDeliveredCount: list.length - deliveredCount,
+    totalOrders: list.length,
+  };
+}
+
+function renderSummaryBox(list){
+  if(list.length===0) return '';
+  const s = summarizeOrders(list);
+  return `
+    <div class="summary" style="margin-bottom:14px;">
+      <div style="font-weight:800;margin-bottom:6px;">총 ${s.totalOrders}건 · ${s.totalQty}개 주문</div>
+      <div style="font-size:13.5px;margin-bottom:4px;">상품별 주문갯수: ${s.countsText}</div>
+      <div style="font-size:13.5px;margin-bottom:4px;">입금완료 ${s.confirmedCount}건 · 입금대기 ${s.pendingCount}건</div>
+      <div style="font-size:13.5px;">전달완료 ${s.deliveredCount}건 · 전달대기 ${s.notDeliveredCount}건</div>
+    </div>
+  `;
+}
+
+function renderOrderListHTML(list, showContact){
+  const sorted = [...list].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+  return sorted.map(o=>`
+    <div class="order-item">
+      <div class="info">
+        ${showContact ? `<b>${o.name || '이름없음'} · ${o.dong||'-'}동 ${o.ho||'-'}호 · ${o.phone||'-'}</b><br>` : ''}
+        ${o.label} × ${o.qty} · ${o.total.toLocaleString()}원<br>
+        <span style="color:var(--ink-soft)">주문번호 ${o.id} · ${new Date(o.createdAt).toLocaleString('ko-KR')}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <span class="status ${o.confirmed?'paid':'pending'}">${o.confirmed?'입금완료':'입금대기'}</span>
+        <span class="status ${o.delivered?'delivered':'notdelivered'}">${o.delivered?'전달완료':'전달대기'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
 async function saveConfig(){
   if(!firebaseReady){ toast('Firebase 설정이 필요합니다.'); return; }
   try{
@@ -620,12 +718,13 @@ function updateForm(){
   document.getElementById('summary-line').textContent = `${p.label} × ${qty}`;
   document.getElementById('summary-total').textContent = `${total.toLocaleString()}원`;
   summary.style.display = 'block';
+  const name = document.getElementById('cust-name').value.trim();
   const dong = document.getElementById('dong').value.trim();
   const ho = document.getElementById('ho').value.trim();
   const phone = document.getElementById('phone').value.trim();
   const dongValid = /^\d{4}$/.test(dong);
   const hoValid = /^\d{3,4}$/.test(ho);
-  submitBtn.disabled = !(remaining>0 && qty>0 && dongValid && hoValid && phone);
+  submitBtn.disabled = !(remaining>0 && qty>0 && name && dongValid && hoValid && phone);
 }
 
 document.getElementById('qty-minus').addEventListener('click', ()=>{
@@ -638,7 +737,7 @@ document.getElementById('qty-plus').addEventListener('click', ()=>{
   el.value = (parseInt(el.value)||1) + 1;
   updateForm();
 });
-['qty','dong','ho','phone'].forEach(id=>{
+['qty','cust-name','dong','ho','phone'].forEach(id=>{
   document.getElementById(id).addEventListener('input', updateForm);
 });
 document.getElementById('dong').addEventListener('input', (e)=>{
@@ -672,10 +771,12 @@ document.getElementById('submit-order').addEventListener('click', async ()=>{
     unitPrice: getPrice(selectedType),
     qty,
     total: qty*getPrice(selectedType),
+    name: document.getElementById('cust-name').value.trim(),
     dong: document.getElementById('dong').value.trim(),
     ho: document.getElementById('ho').value.trim(),
     phone: document.getElementById('phone').value.trim(),
     confirmed: false,
+    delivered: false,
     createdAt: new Date().toISOString(),
   };
   // reload latest orders to avoid stomping concurrent submissions
@@ -692,6 +793,7 @@ document.getElementById('submit-order').addEventListener('click', async ()=>{
   orders.push(order);
   await saveOrders();
   renderSlices();
+  document.getElementById('cust-name').value='';
   document.getElementById('dong').value='';
   document.getElementById('ho').value='';
   document.getElementById('phone').value='';
@@ -699,7 +801,7 @@ document.getElementById('submit-order').addEventListener('click', async ()=>{
   updateForm();
   btn.textContent = '주문 접수하기';
   toast(`주문이 접수되었습니다! 주문번호 ${order.id}`);
-  alert(`주문이 접수되었습니다.\n\n주문번호: ${order.id}\n${order.label} × ${order.qty}\n결제금액: ${order.total.toLocaleString()}원\n\n농협 150142-56-046199 (예금주 확인)\n위 계좌로 입금해주시면 확인 후 발송해드립니다.\n입금 확인 여부는 '입금확인 조회' 탭에서 연락처로 조회하실 수 있어요.`);
+  alert(`주문이 접수되었습니다.\n\n주문번호: ${order.id}\n${order.label} × ${order.qty}\n결제금액: ${order.total.toLocaleString()}원\n\n농협 150142-56-046199 (예금주 확인)\n위 계좌로 입금해주시면 확인 후 발송해드립니다.\n입금 확인 여부는 '입금확인 조회' 탭에서 연락처, 동+호수, 이름 중 편한 방법으로 조회하실 수 있어요.`);
 });
 
 document.getElementById('copy-account').addEventListener('click', ()=>{
@@ -712,37 +814,64 @@ document.getElementById('copy-account').addEventListener('click', ()=>{
 });
 
 // TABS
-document.querySelectorAll('.tab').forEach(tab=>{
+document.querySelectorAll('.tab[data-tab]').forEach(tab=>{
   tab.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab[data-tab]').forEach(t=>t.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
   });
 });
 
-// CHECK PANEL
+// CHECK PANEL - 조회 방식 전환 (연락처/동호수/이름)
+document.querySelectorAll('.tab[data-check-mode]').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab[data-check-mode]').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    ['phone','dongho','name'].forEach(m=>{
+      document.getElementById('check-mode-'+m).style.display = (m===tab.dataset.checkMode) ? 'block' : 'none';
+    });
+    document.getElementById('check-results').innerHTML = '';
+  });
+});
+
 document.getElementById('check-btn').addEventListener('click', async ()=>{
-  const phone = document.getElementById('check-phone').value.trim();
   const results = document.getElementById('check-results');
-  if(!phone){ toast('연락처를 입력해주세요.'); return; }
-  results.innerHTML = '<div class="empty">조회 중...</div>';
-  await loadOrdersOnly();
-  const mine = orders.filter(o=>o.phone.replace(/-/g,'') === phone.replace(/-/g,''));
+  const activeTab = document.querySelector('.tab[data-check-mode].active');
+  const mode = activeTab ? activeTab.dataset.checkMode : 'phone';
+
+  let mine = [];
+  let emptyMsg = '';
+
+  if(mode === 'phone'){
+    const phone = document.getElementById('check-phone').value.trim();
+    if(!phone){ toast('연락처를 입력해주세요.'); return; }
+    results.innerHTML = '<div class="empty">조회 중...</div>';
+    await loadOrdersOnly();
+    mine = orders.filter(o=>o.phone && o.phone.replace(/-/g,'') === phone.replace(/-/g,''));
+    emptyMsg = '해당 연락처로 접수된 주문이 없습니다.';
+  }else if(mode === 'dongho'){
+    const dong = document.getElementById('check-dong').value.trim();
+    const ho = document.getElementById('check-ho').value.trim();
+    if(!dong || !ho){ toast('동과 호수를 모두 입력해주세요.'); return; }
+    results.innerHTML = '<div class="empty">조회 중...</div>';
+    await loadOrdersOnly();
+    mine = orders.filter(o=>o.dong === dong && o.ho === ho);
+    emptyMsg = '해당 동/호수로 접수된 주문이 없습니다.';
+  }else{
+    const name = document.getElementById('check-name').value.trim();
+    if(!name){ toast('이름을 입력해주세요.'); return; }
+    results.innerHTML = '<div class="empty">조회 중...</div>';
+    await loadOrdersOnly();
+    mine = orders.filter(o=>o.name && o.name.trim() === name);
+    emptyMsg = '해당 이름으로 접수된 주문이 없습니다.';
+  }
+
   if(mine.length===0){
-    results.innerHTML = '<div class="empty">해당 연락처로 접수된 주문이 없습니다.</div>';
+    results.innerHTML = `<div class="empty">${emptyMsg}</div>`;
     return;
   }
-  results.innerHTML = mine.map(o=>`
-    <div class="order-item">
-      <div class="info">
-        <b>${o.label} × ${o.qty}</b><br>
-        주문번호 ${o.id} · ${o.total.toLocaleString()}원<br>
-        <span style="color:var(--ink-soft)">${new Date(o.createdAt).toLocaleString('ko-KR')}</span>
-      </div>
-      <div class="status ${o.confirmed?'paid':'pending'}">${o.confirmed?'입금완료':'입금대기'}</div>
-    </div>
-  `).join('');
+  results.innerHTML = renderSummaryBox(mine) + renderOrderListHTML(mine, false);
 });
 
 // ADMIN
@@ -839,13 +968,16 @@ document.getElementById('manual-add').addEventListener('click', async ()=>{
   msg.style.color = 'var(--danger)';
   const type = document.getElementById('manual-type').value;
   const qty = parseInt(document.getElementById('manual-qty').value)||0;
+  const name = document.getElementById('manual-name').value.trim();
   const dong = document.getElementById('manual-dong').value.trim();
   const ho = document.getElementById('manual-ho').value.trim();
   const phone = document.getElementById('manual-phone').value.trim();
   const confirmed = document.getElementById('manual-confirmed').checked;
+  const delivered = document.getElementById('manual-delivered').checked;
 
   if(!type){ msg.textContent = '박스 종류를 선택해주세요.'; return; }
   if(qty < 1){ msg.textContent = '수량을 1개 이상 입력해주세요.'; return; }
+  if(!name){ msg.textContent = '이름을 입력해주세요.'; return; }
   if(!/^\d{4}$/.test(dong)){ msg.textContent = '동은 숫자 4자리로 입력해주세요.'; return; }
   if(!/^\d{3,4}$/.test(ho)){ msg.textContent = '호수는 숫자 3~4자리로 입력해주세요.'; return; }
   if(!phone){ msg.textContent = '연락처를 입력해주세요.'; return; }
@@ -873,8 +1005,9 @@ document.getElementById('manual-add').addEventListener('click', async ()=>{
     unitPrice: getPrice(type),
     qty,
     total: qty*getPrice(type),
-    dong, ho, phone,
+    name, dong, ho, phone,
     confirmed,
+    delivered,
     createdAt: new Date().toISOString(),
   };
   orders.push(order);
@@ -884,16 +1017,48 @@ document.getElementById('manual-add').addEventListener('click', async ()=>{
   msg.textContent = '주문이 등록되었습니다.';
   document.getElementById('manual-type').value = '';
   document.getElementById('manual-qty').value = 1;
+  document.getElementById('manual-name').value = '';
   document.getElementById('manual-dong').value = '';
   document.getElementById('manual-ho').value = '';
   document.getElementById('manual-phone').value = '';
   document.getElementById('manual-confirmed').checked = false;
+  document.getElementById('manual-delivered').checked = false;
   btn.disabled = false;
   btn.textContent = '주문 등록하기';
   renderManualTypeOptions();
   renderAdminOrders();
   renderSlices();
   toast('주문이 등록되었습니다.');
+});
+
+// 관리자용 - 동+호수 또는 이름으로 기존 주문 조회
+document.getElementById('manual-lookup').addEventListener('click', async ()=>{
+  const results = document.getElementById('manual-lookup-results');
+  const name = document.getElementById('manual-name').value.trim();
+  const dong = document.getElementById('manual-dong').value.trim();
+  const ho = document.getElementById('manual-ho').value.trim();
+
+  if(!(dong && ho) && !name){
+    toast('동+호수 또는 이름을 입력한 뒤 조회해주세요.');
+    return;
+  }
+
+  results.innerHTML = '<div class="empty">조회 중...</div>';
+  await loadOrdersOnly();
+
+  let mine = [];
+  if(dong && ho){
+    mine = orders.filter(o=>o.dong === dong && o.ho === ho);
+  }
+  if(mine.length===0 && name){
+    mine = orders.filter(o=>o.name && o.name.trim() === name);
+  }
+
+  if(mine.length===0){
+    results.innerHTML = '<div class="empty">일치하는 기존 주문이 없습니다.</div>';
+    return;
+  }
+  results.innerHTML = renderSummaryBox(mine) + renderOrderListHTML(mine, true);
 });
 
 document.getElementById('save-limits').addEventListener('click', async ()=>{
@@ -927,6 +1092,7 @@ document.getElementById('export-excel').addEventListener('click', async ()=>{
   const sorted = [...orders].sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
   const rows = sorted.map(o=>({
     '주문번호': o.id,
+    '이름': o.name || '',
     '동': o.dong,
     '호수': o.ho,
     '연락처': o.phone,
@@ -935,13 +1101,14 @@ document.getElementById('export-excel').addEventListener('click', async ()=>{
     '단가': o.unitPrice,
     '결제금액': o.total,
     '입금상태': o.confirmed ? '입금완료' : '입금대기',
+    '전달상태': o.delivered ? '전달완료' : '전달대기',
     '접수일시': new Date(o.createdAt).toLocaleString('ko-KR'),
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [
-    {wch:14},{wch:6},{wch:8},{wch:15},{wch:10},
-    {wch:6},{wch:10},{wch:10},{wch:10},{wch:20}
+    {wch:14},{wch:10},{wch:6},{wch:8},{wch:15},{wch:10},
+    {wch:6},{wch:10},{wch:10},{wch:10},{wch:10},{wch:20}
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '주문목록');
@@ -964,6 +1131,9 @@ function renderAdminOrders(){
     <div class="order-item">
       <div class="info">
         <div style="margin-bottom:4px;">
+          <span class="field-tag">이름</span> <b>${o.name || '이름없음'}</b>
+        </div>
+        <div style="margin-bottom:4px;">
           <span class="field-tag">동/호수</span> <b>${o.dong}동 ${o.ho}호</b>
         </div>
         <div style="margin-bottom:4px;">
@@ -976,13 +1146,17 @@ function renderAdminOrders(){
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
         <span class="status ${o.confirmed?'paid':'pending'}">${o.confirmed?'입금완료':'입금대기'}</span>
-        <button class="btn ${o.confirmed?'btn-outline':'btn-primary'} btn-small" data-id="${o.id}">
+        <button class="btn ${o.confirmed?'btn-outline':'btn-primary'} btn-small" data-id="${o.id}" data-action="confirm">
           ${o.confirmed?'입금대기로 변경':'입금완료 처리'}
+        </button>
+        <span class="status ${o.delivered?'delivered':'notdelivered'}">${o.delivered?'전달완료':'전달대기'}</span>
+        <button class="btn ${o.delivered?'btn-outline':'btn-primary'} btn-small" data-id="${o.id}" data-action="deliver">
+          ${o.delivered?'전달대기로 변경':'전달완료 처리'}
         </button>
       </div>
     </div>
   `).join('');
-  wrap.querySelectorAll('button[data-id]').forEach(btn=>{
+  wrap.querySelectorAll('button[data-action="confirm"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       await loadOrdersOnly();
       const target = orders.find(o=>o.id===btn.dataset.id);
@@ -991,6 +1165,18 @@ function renderAdminOrders(){
         await saveOrders();
         renderAdminOrders();
         toast(target.confirmed ? '입금완료로 처리했습니다.' : '입금대기로 변경했습니다.');
+      }
+    });
+  });
+  wrap.querySelectorAll('button[data-action="deliver"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      await loadOrdersOnly();
+      const target = orders.find(o=>o.id===btn.dataset.id);
+      if(target){
+        target.delivered = !target.delivered;
+        await saveOrders();
+        renderAdminOrders();
+        toast(target.delivered ? '전달완료로 처리했습니다.' : '전달대기로 변경했습니다.');
       }
     });
   });
