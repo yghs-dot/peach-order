@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>복숭아 주문</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg: #FCF3E7;
+    --bg-card: #FFFDF9;
+    --ink: #3B2A22;
+    --ink-soft: #7A6A5E;
+    --coral: #F2795C;
+    --coral-dark: #D6603F;
+    --leaf: #5B8C5A;
+    --leaf-dark: #3F6B40;
+    --gold: #E3A857;
+    --line: #EADFD0;
+    --danger: #C1503B;
+    --radius: 18px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family:'Noto Sans KR', sans-serif;
+    line-height:1.6;
+    padding-bottom:60px;
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:0 20px;}
+
+  /* HERO */
+  .hero{
+    position:relative;
+    padding:56px 20px 44px;
+    text-align:center;
+    overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% 0%, #FEEADB 0%, var(--bg) 70%);
+    border-bottom:1px solid var(--line);
+  }
+  .hero .eyebrow{
+    display:inline-block;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:.14em;
+    color:var(--leaf-dark);
+    background:#EAF3E7;
+    padding:6px 14px;
+    border-radius:999px;
+    margin-bottom:18px;
+  }
+  .hero h1{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:clamp(34px,7vw,52px);
+    margin:0 0 10px;
+    color:var(--coral-dark);
+    letter-spacing:-0.01em;
+  }
+  .hero p{
+    color:var(--ink-soft);
+    font-size:16px;
+    max-width:460px;
+    margin:0 auto;
+  }
+  .peach-mark{
+    width:64px;height:64px;margin:0 auto 8px;
+  }
+
+  /* NAV TABS */
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin:28px 0 20px;
+    background:#F3E6D6;
+    padding:6px;
+    border-radius:14px;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:11px 8px;
+    border-radius:10px;
+    font-weight:700;
+    font-size:14.5px;
+    cursor:pointer;
+    color:var(--ink-soft);
+    transition:.15s;
+    user-select:none;
+  }
+  .tab.active{
+    background:var(--bg-card);
+    color:var(--coral-dark);
+    box-shadow:0 2px 8px rgba(59,42,34,.08);
+  }
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .card{
+    background:var(--bg-card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px;
+    margin-bottom:16px;
+  }
+  .card h2{
+    font-family:'Fraunces', serif;
+    font-size:21px;
+    margin:0 0 4px;
+    color:var(--ink);
+  }
+  .card .sub{color:var(--ink-soft);font-size:13.5px;margin-bottom:16px;}
+
+  /* Stock grid - the "peach slices" */
+  .slices{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+    margin-bottom:6px;
+  }
+  .slice{
+    position:relative;
+    border:2px solid var(--line);
+    border-radius:14px;
+    padding:14px 14px 12px;
+    cursor:pointer;
+    transition:.15s;
+    background:#FFFCF7;
+  }
+  .slice:hover{border-color:#F2C5AE;}
+  .slice.selected{
+    border-color:var(--coral);
+    background:#FFF3EC;
+    box-shadow:0 0 0 3px rgba(242,121,92,.14);
+  }
+  .slice.soldout{
+    opacity:.5;
+    cursor:not-allowed;
+    background:#F4EFE7;
+  }
+  .slice .label{font-weight:900;font-size:15px;color:var(--ink);}
+  .slice .price{font-family:'Fraunces',serif;font-weight:700;font-size:19px;color:var(--coral-dark);margin:4px 0 8px;}
+  .slice .stockbar{height:6px;border-radius:4px;background:#EDE3D5;overflow:hidden;margin-bottom:6px;}
+  .slice .stockbar-fill{height:100%;background:var(--leaf);border-radius:4px;transition:width .3s;}
+  .slice .stocktext{font-size:12px;color:var(--ink-soft);font-weight:500;}
+  .slice .soldout-badge{
+    position:absolute;top:10px;right:10px;
+    font-size:11px;font-weight:900;color:#fff;
+    background:var(--danger);padding:3px 8px;border-radius:6px;
+  }
+
+  label.field{display:block;margin:14px 0 6px;font-weight:700;font-size:13.5px;color:var(--ink);}
+  input[type=text], input[type=tel], input[type=number], input[type=password]{
+    width:100%;
+    padding:12px 14px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    font-size:15px;
+    font-family:inherit;
+    background:#fff;
+    color:var(--ink);
+  }
+  input:focus{outline:2px solid var(--coral);outline-offset:1px;border-color:var(--coral);}
+
+  .qty-row{display:flex;align-items:center;gap:10px;}
+  .qty-row button{
+    width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);
+    background:#fff;font-size:18px;font-weight:700;cursor:pointer;color:var(--ink);
+  }
+  .qty-row input{text-align:center;max-width:70px;}
+
+  .summary{
+    background:#FBF1E6;
+    border-radius:12px;
+    padding:14px 16px;
+    margin-top:16px;
+    font-size:14.5px;
+  }
+  .summary .total{font-family:'Fraunces',serif;font-weight:700;font-size:22px;color:var(--coral-dark);}
+
+  .btn{
+    display:inline-block;
+    width:100%;
+    text-align:center;
+    padding:14px;
+    border-radius:12px;
+    border:none;
+    font-weight:800;
+    font-size:15.5px;
+    cursor:pointer;
+    margin-top:16px;
+    transition:.15s;
+  }
+  .btn-primary{background:var(--coral);color:#fff;}
+  .btn-primary:hover{background:var(--coral-dark);}
+  .btn-primary:disabled{background:#D9CDBE;cursor:not-allowed;}
+  .btn-outline{background:transparent;border:1.5px solid var(--line);color:var(--ink);}
+  .btn-outline:hover{border-color:var(--coral);color:var(--coral-dark);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-small{width:auto;padding:8px 14px;font-size:13px;margin-top:0;}
+
+  .account-box{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:#EAF3E7;
+    border:1px solid #CFE3CB;
+    border-radius:12px;
+    padding:14px 16px;
+    margin-top:12px;
+  }
+  .account-box .num{font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:var(--leaf-dark);}
+  .account-box .bank{font-size:12.5px;color:var(--ink-soft);}
+  .copy-btn{
+    border:1.5px solid var(--leaf);color:var(--leaf-dark);background:#fff;
+    padding:7px 12px;border-radius:8px;font-weight:700;font-size:12.5px;cursor:pointer;white-space:nowrap;
+  }
+
+  .notice{
+    font-size:13px;
+    color:var(--ink-soft);
+    background:#FBF1E6;
+    border-left:3px solid var(--gold);
+    padding:10px 14px;
+    border-radius:8px;
+    margin-top:14px;
+  }
+
+  .order-item{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px 16px;
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .order-item .info{font-size:13.5px;}
+  .order-item .info b{font-size:14.5px;}
+  .field-tag{
+    display:inline-block;
+    font-size:11px;
+    font-weight:800;
+    color:var(--coral-dark);
+    background:#FBEAE3;
+    padding:2px 7px;
+    border-radius:6px;
+    margin-right:4px;
+    min-width:52px;
+    text-align:center;
+  }
+  .status{
+    font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;
+  }
+  .status.paid{background:#E4F3E1;color:var(--leaf-dark);}
+  .status.pending{background:#FBEAE3;color:var(--danger);}
+
+  .empty{
+    text-align:center;
+    color:var(--ink-soft);
+    padding:30px 10px;
+    font-size:14px;
+  }
+  .divider{height:1px;background:var(--line);margin:18px 0;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .small-note{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .locked-msg{text-align:center;padding:40px 10px;}
+  .locked-msg .icon{font-size:36px;margin-bottom:10px;}
+  #toast{
+    position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:12px 20px;border-radius:10px;
+    font-size:14px;font-weight:600;opacity:0;transition:.25s;pointer-events:none;z-index:999;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .setup-banner{
+    max-width:720px;margin:20px auto 0;padding:16px 18px;
+    background:#FDECEA;border:1.5px solid #F0B4AC;border-radius:14px;
+    color:#8A2E1F;font-size:13.5px;line-height:1.6;
+  }
+  .setup-banner b{display:block;font-size:15px;margin-bottom:4px;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <svg class="peach-mark" viewBox="0 0 64 64" fill="none">
+    <path d="M32 14c8 0 14 7 14 17s-7 21-14 21-14-11-14-21 6-17 14-17z" fill="#F2795C"/>
+    <path d="M32 14c8 0 14 7 14 17s-7 21-14 21" fill="#D6603F" opacity=".5"/>
+    <path d="M32 15c-1-6 2-9 7-10" stroke="#5B8C5A" stroke-width="2.4" stroke-linecap="round"/>
+    <ellipse cx="27" cy="24" rx="3.5" ry="5" fill="#FCCFBB" opacity=".7"/>
+  </svg>
+  <div class="eyebrow">2026 여름 산지 직송</div>
+  <h1>복숭아 주문 접수</h1>
+  <p>박스 규격을 고르고 주문하면, 입금 확인 후 순서대로 발송해드려요.</p>
+</div>
+
+<div class="wrap">
+  <div class="setup-banner" id="setup-banner" style="display:none;">
+    <b>⚠️ 설정이 필요해요</b>
+    이 웹앱은 Firebase(무료 데이터 저장소) 연결이 되어야 작동합니다. 코드 상단의 <code>firebaseConfig</code> 부분을 본인의 Firebase 프로젝트 키로 채워주세요. 자세한 방법은 앱 제공자(관리자)에게 문의해주세요.
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-tab="order">주문하기</div>
+    <div class="tab" data-tab="check">입금확인 조회</div>
+    <div class="tab" data-tab="admin">관리자</div>
+  </div>
+
+  <!-- ORDER PANEL -->
+  <div class="panel active" id="panel-order">
+
+    <div class="card">
+      <h2>1. 박스 선택</h2>
+      <div class="sub">4kg 기준, 개수가 많을수록 낱개가 작아 가격이 저렴해요.</div>
+      <div class="slices" id="slices"></div>
+      <div class="small-note" id="soldout-all" style="display:none;color:var(--danger);font-weight:700;">
+        😢 모든 박스가 주문 마감되었습니다. 다음 시즌에 만나요!
+      </div>
+    </div>
+
+    <div class="card" id="order-form-card">
+      <h2>2. 주문 정보</h2>
+      <label class="field">수량</label>
+      <div class="qty-row">
+        <button type="button" id="qty-minus">−</button>
+        <input type="number" id="qty" value="1" min="1">
+        <button type="button" id="qty-plus">+</button>
+        <span class="small-note" id="qty-max"></span>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label class="field">동 (3자리)</label>
+          <input type="text" id="dong" placeholder="101" inputmode="numeric" maxlength="3">
+        </div>
+        <div>
+          <label class="field">호수 (4자리)</label>
+          <input type="text" id="ho" placeholder="1503" inputmode="numeric" maxlength="4">
+        </div>
+      </div>
+      <label class="field">연락처</label>
+      <input type="tel" id="phone" placeholder="010-1234-5678">
+
+      <div class="summary" id="summary" style="display:none;">
+        <div id="summary-line"></div>
+        <div class="total" id="summary-total"></div>
+      </div>
+
+      <button class="btn btn-primary" id="submit-order" disabled>주문 접수하기</button>
+      <div class="notice">주문 접수 후에도 결제(입금)가 확인되어야 최종 확정돼요. 아래 계좌로 입금해주세요.</div>
+      <div class="account-box">
+        <div>
+          <div class="bank">농협 · 예금주 확인 후 입금</div>
+          <div class="num">150142-56-046199</div>
+        </div>
+        <button class="copy-btn" id="copy-account">계좌복사</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECK PANEL -->
+  <div class="panel" id="panel-check">
+    <div class="card">
+      <h2>입금확인 조회</h2>
+      <div class="sub">주문 시 입력한 연락처로 주문 내역과 입금 확인 여부를 조회할 수 있어요.</div>
+      <label class="field">연락처</label>
+      <input type="tel" id="check-phone" placeholder="010-1234-5678">
+      <button class="btn btn-outline" id="check-btn">조회하기</button>
+      <div id="check-results" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div class="panel" id="panel-admin">
+    <div class="card" id="admin-lock">
+      <div class="locked-msg">
+        <div class="icon">🔒</div>
+        <h2>관리자 로그인</h2>
+        <div class="sub">비밀번호를 입력해주세요.</div>
+        <input type="password" id="admin-pw" placeholder="관리자 비밀번호" style="max-width:260px;margin:0 auto 12px;">
+        <button class="btn btn-primary" id="admin-login" style="max-width:260px;">로그인</button>
+        <div class="small-note" id="admin-error" style="color:var(--danger);display:none;">비밀번호가 올바르지 않습니다.</div>
+      </div>
+    </div>
+
+    <div id="admin-content" style="display:none;">
+      <div class="card">
+        <h2>가격 · 재고 설정</h2>
+        <div class="sub">각 규격별 판매가격과 총 판매수량을 설정하세요. 가격을 바꿔도 이미 접수된 주문의 금액은 변경되지 않아요.</div>
+        <div id="admin-limits"></div>
+        <button class="btn btn-primary" id="save-limits">가격 · 재고 설정 저장</button>
+      </div>
+
+      <div class="card">
+        <h2>주문 목록</h2>
+        <div class="sub">입금 확인 후 '입금완료'로 표시해주세요.</div>
+        <div id="admin-orders"></div>
+      </div>
+
+      <div class="card">
+        <h2>관리자 비밀번호 변경</h2>
+        <div class="sub">비밀번호는 관리자 화면 접속에만 사용돼요. 변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</div>
+        <label class="field">현재 비밀번호</label>
+        <input type="password" id="pw-current" placeholder="현재 비밀번호">
+        <label class="field">새 비밀번호</label>
+        <input type="password" id="pw-new" placeholder="새 비밀번호 (4자 이상)">
+        <label class="field">새 비밀번호 확인</label>
+        <input type="password" id="pw-confirm" placeholder="새 비밀번호 다시 입력">
+        <button class="btn btn-primary" id="save-pw">비밀번호 변경</button>
+        <div class="small-note" id="pw-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   Firebase 설정 — 아래 값을 본인의 Firebase 프로젝트 값으로 교체하세요.
+   Firebase 콘솔(console.firebase.google.com) > 프로젝트 설정 > 일반 >
+   "내 앱" 섹션의 SDK 설정 값을 그대로 복사해 붙여넣으면 됩니다.
+   ============================================================ */
+const firebaseConfig = {
+     apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+     authDomain: "peach-order-xxxxx.firebaseapp.com",
+     projectId: "peach-order-xxxxx",
+     storageBucket: "peach-order-xxxxx.appspot.com",
+     messagingSenderId: "123456789012",
+     appId: "1:123456789012:web:abcdef1234567890"
+   };
+
+let db = null;
+let firebaseReady = false;
+try{
+  if(firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('여기에')){
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    firebaseReady = true;
+  }
+}catch(e){
+  console.error('Firebase 초기화 오류', e);
+}
+
+const CONFIG_DOC = () => db.collection('peach').doc('config');
+const ORDERS_DOC = () => db.collection('peach').doc('orders');
+const ADMIN_DOC = () => db.collection('peach').doc('admin');
+
+const PRODUCTS = [
+  {key:'10', label:'10개입', price:30000},
+  {key:'11', label:'11개입', price:28000},
+  {key:'12', label:'12개입', price:26000},
+  {key:'13', label:'13개입', price:24000},
+];
+const DEFAULT_ADMIN_PW = 'peach2026';
+let adminPassword = DEFAULT_ADMIN_PW;
+
+async function loadAdminPassword(){
+  if(!firebaseReady) return;
+  try{
+    const snap = await ADMIN_DOC().get();
+    if(snap.exists && snap.data().pw) adminPassword = snap.data().pw;
+  }catch(e){ /* not set yet, keep default */ }
+}
+
+let config = { limits: {10:0,11:0,12:0,13:0}, prices: {} };
+let orders = [];
+let selectedType = null;
+
+function getPrice(key){
+  if(config.prices && config.prices[key] !== undefined && config.prices[key] !== null){
+    return config.prices[key];
+  }
+  const p = PRODUCTS.find(x=>x.key===key);
+  return p ? p.price : 0;
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+async function loadData(){
+  if(!firebaseReady){
+    document.getElementById('setup-banner').style.display = 'block';
+    return;
+  }
+  try{
+    const c = await CONFIG_DOC().get();
+    if(c.exists) config = c.data();
+  }catch(e){ console.error(e); }
+  try{
+    const o = await ORDERS_DOC().get();
+    if(o.exists) orders = o.data().list || [];
+  }catch(e){ orders = []; console.error(e); }
+}
+
+async function saveConfig(){
+  if(!firebaseReady){ toast('Firebase 설정이 필요합니다.'); return; }
+  try{
+    await CONFIG_DOC().set(config);
+  }catch(e){ toast('저장 중 오류가 발생했습니다.'); }
+}
+async function saveOrders(){
+  if(!firebaseReady){ toast('Firebase 설정이 필요합니다.'); return; }
+  try{
+    await ORDERS_DOC().set({ list: orders });
+  }catch(e){ toast('저장 중 오류가 발생했습니다.'); }
+}
+
+function remainingFor(key){
+  const limit = (config.limits && config.limits[key]) || 0;
+  const used = orders.filter(o=>o.type===key).reduce((s,o)=>s+o.qty,0);
+  return Math.max(0, limit - used);
+}
+
+function renderSlices(){
+  const wrap = document.getElementById('slices');
+  wrap.innerHTML = '';
+  let anyLeft = false;
+  PRODUCTS.forEach(p=>{
+    const limit = (config.limits && config.limits[p.key]) || 0;
+    const remaining = remainingFor(p.key);
+    if(remaining>0) anyLeft = true;
+    const pct = limit>0 ? Math.round((remaining/limit)*100) : 0;
+    const div = document.createElement('div');
+    div.className = 'slice' + (remaining<=0 ? ' soldout':'') + (selectedType===p.key ? ' selected':'');
+    div.innerHTML = `
+      ${remaining<=0 ? '<div class="soldout-badge">마감</div>' : ''}
+      <div class="label">${p.label}</div>
+      <div class="price">${getPrice(p.key).toLocaleString()}원</div>
+      <div class="stockbar"><div class="stockbar-fill" style="width:${pct}%"></div></div>
+      <div class="stocktext">남은 수량 ${remaining} / ${limit}</div>
+    `;
+    if(remaining>0){
+      div.addEventListener('click', ()=>{
+        selectedType = p.key;
+        document.getElementById('qty').value = 1;
+        renderSlices();
+        updateForm();
+      });
+    }
+    wrap.appendChild(div);
+  });
+  document.getElementById('soldout-all').style.display = anyLeft ? 'none' : 'block';
+  document.getElementById('order-form-card').style.display = anyLeft ? 'block':'none';
+}
+
+function updateForm(){
+  const qtyMax = document.getElementById('qty-max');
+  const submitBtn = document.getElementById('submit-order');
+  const summary = document.getElementById('summary');
+  if(!selectedType){
+    qtyMax.textContent = '박스를 먼저 선택해주세요';
+    submitBtn.disabled = true;
+    summary.style.display = 'none';
+    return;
+  }
+  const p = PRODUCTS.find(x=>x.key===selectedType);
+  const remaining = remainingFor(selectedType);
+  qtyMax.textContent = `최대 ${remaining}개`;
+  let qty = parseInt(document.getElementById('qty').value)||1;
+  if(qty<1) qty=1;
+  if(qty>remaining) qty=remaining;
+  document.getElementById('qty').value = qty;
+  const total = qty*getPrice(selectedType);
+  document.getElementById('summary-line').textContent = `${p.label} × ${qty}`;
+  document.getElementById('summary-total').textContent = `${total.toLocaleString()}원`;
+  summary.style.display = 'block';
+  const dong = document.getElementById('dong').value.trim();
+  const ho = document.getElementById('ho').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const dongValid = /^\d{3}$/.test(dong);
+  const hoValid = /^\d{4}$/.test(ho);
+  submitBtn.disabled = !(remaining>0 && qty>0 && dongValid && hoValid && phone);
+}
+
+document.getElementById('qty-minus').addEventListener('click', ()=>{
+  const el = document.getElementById('qty');
+  el.value = Math.max(1, (parseInt(el.value)||1) - 1);
+  updateForm();
+});
+document.getElementById('qty-plus').addEventListener('click', ()=>{
+  const el = document.getElementById('qty');
+  el.value = (parseInt(el.value)||1) + 1;
+  updateForm();
+});
+['qty','dong','ho','phone'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateForm);
+});
+document.getElementById('dong').addEventListener('input', (e)=>{
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,3);
+});
+document.getElementById('ho').addEventListener('input', (e)=>{
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
+});
+
+document.getElementById('submit-order').addEventListener('click', async ()=>{
+  const btn = document.getElementById('submit-order');
+  if(!firebaseReady){
+    toast('앱 설정이 완료되지 않았습니다. 관리자에게 문의해주세요.');
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '접수 중...';
+  const p = PRODUCTS.find(x=>x.key===selectedType);
+  const qty = parseInt(document.getElementById('qty').value)||1;
+  const remaining = remainingFor(selectedType);
+  if(qty > remaining || remaining<=0){
+    toast('선택한 수량이 남은 재고보다 많습니다. 다시 확인해주세요.');
+    btn.textContent = '주문 접수하기';
+    updateForm();
+    return;
+  }
+  const order = {
+    id: 'ORD' + Date.now().toString(36).toUpperCase(),
+    type: selectedType,
+    label: p.label,
+    unitPrice: getPrice(selectedType),
+    qty,
+    total: qty*getPrice(selectedType),
+    dong: document.getElementById('dong').value.trim(),
+    ho: document.getElementById('ho').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
+    confirmed: false,
+    createdAt: new Date().toISOString(),
+  };
+  // reload latest orders to avoid stomping concurrent submissions
+  await loadData();
+  const nowRemaining = remainingFor(selectedType);
+  if(qty > nowRemaining){
+    toast('죄송해요, 방금 재고가 모두 소진되었습니다. 다른 박스를 선택해주세요.');
+    btn.textContent = '주문 접수하기';
+    selectedType = null;
+    renderSlices();
+    updateForm();
+    return;
+  }
+  orders.push(order);
+  await saveOrders();
+  renderSlices();
+  document.getElementById('dong').value='';
+  document.getElementById('ho').value='';
+  document.getElementById('phone').value='';
+  selectedType = null;
+  updateForm();
+  btn.textContent = '주문 접수하기';
+  toast(`주문이 접수되었습니다! 주문번호 ${order.id}`);
+  alert(`주문이 접수되었습니다.\n\n주문번호: ${order.id}\n${order.label} × ${order.qty}\n결제금액: ${order.total.toLocaleString()}원\n\n농협 150142-56-046199 (예금주 확인)\n위 계좌로 입금해주시면 확인 후 발송해드립니다.\n입금 확인 여부는 '입금확인 조회' 탭에서 연락처로 조회하실 수 있어요.`);
+});
+
+document.getElementById('copy-account').addEventListener('click', ()=>{
+  const text = '150142-56-046199';
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(text).then(()=>toast('계좌번호가 복사되었습니다.'));
+  }else{
+    toast('계좌번호: ' + text);
+  }
+});
+
+// TABS
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+  });
+});
+
+// CHECK PANEL
+document.getElementById('check-btn').addEventListener('click', async ()=>{
+  const phone = document.getElementById('check-phone').value.trim();
+  const results = document.getElementById('check-results');
+  if(!phone){ toast('연락처를 입력해주세요.'); return; }
+  await loadData();
+  const mine = orders.filter(o=>o.phone.replace(/-/g,'') === phone.replace(/-/g,''));
+  if(mine.length===0){
+    results.innerHTML = '<div class="empty">해당 연락처로 접수된 주문이 없습니다.</div>';
+    return;
+  }
+  results.innerHTML = mine.map(o=>`
+    <div class="order-item">
+      <div class="info">
+        <b>${o.label} × ${o.qty}</b><br>
+        주문번호 ${o.id} · ${o.total.toLocaleString()}원<br>
+        <span style="color:var(--ink-soft)">${new Date(o.createdAt).toLocaleString('ko-KR')}</span>
+      </div>
+      <div class="status ${o.confirmed?'paid':'pending'}">${o.confirmed?'입금완료':'입금대기'}</div>
+    </div>
+  `).join('');
+});
+
+// ADMIN
+document.getElementById('admin-login').addEventListener('click', async ()=>{
+  const btn = document.getElementById('admin-login');
+  btn.disabled = true;
+  btn.textContent = '확인 중...';
+  await loadAdminPassword();
+  const pw = document.getElementById('admin-pw').value;
+  btn.disabled = false;
+  btn.textContent = '로그인';
+  if(pw === adminPassword){
+    document.getElementById('admin-error').style.display='none';
+    document.getElementById('admin-lock').style.display='none';
+    document.getElementById('admin-content').style.display='block';
+    renderAdmin();
+  }else{
+    document.getElementById('admin-error').style.display='block';
+  }
+});
+
+document.getElementById('save-pw').addEventListener('click', async ()=>{
+  const msg = document.getElementById('pw-msg');
+  const current = document.getElementById('pw-current').value;
+  const next = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  msg.style.color = 'var(--danger)';
+  await loadAdminPassword();
+  if(current !== adminPassword){
+    msg.textContent = '현재 비밀번호가 올바르지 않습니다.';
+    return;
+  }
+  if(next.length < 4){
+    msg.textContent = '새 비밀번호는 4자 이상이어야 합니다.';
+    return;
+  }
+  if(next !== confirm){
+    msg.textContent = '새 비밀번호가 서로 일치하지 않습니다.';
+    return;
+  }
+  try{
+    await ADMIN_DOC().set({ pw: next });
+    adminPassword = next;
+    msg.style.color = 'var(--leaf-dark)';
+    msg.textContent = '비밀번호가 변경되었습니다.';
+    document.getElementById('pw-current').value = '';
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+    toast('관리자 비밀번호가 변경되었습니다.');
+  }catch(e){
+    msg.textContent = '저장 중 오류가 발생했습니다. 다시 시도해주세요.';
+  }
+});
+
+function renderAdminLimits(){
+  const wrap = document.getElementById('admin-limits');
+  wrap.innerHTML = PRODUCTS.map(p=>`
+    <div class="price-edit-row" style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line);">
+      <div style="font-weight:800;font-size:14.5px;margin-bottom:8px;">${p.label}</div>
+      <div class="row2">
+        <div>
+          <label class="field" style="margin:0 0 4px;font-weight:600;font-size:12.5px;color:var(--ink-soft);">판매가격 (원)</label>
+          <input type="number" min="0" step="100" id="price-${p.key}" value="${getPrice(p.key)}">
+        </div>
+        <div>
+          <label class="field" style="margin:0 0 4px;font-weight:600;font-size:12.5px;color:var(--ink-soft);">총 판매수량</label>
+          <input type="number" min="0" id="limit-${p.key}" value="${(config.limits&&config.limits[p.key])||0}">
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('save-limits').addEventListener('click', async ()=>{
+  const newLimits = {};
+  const newPrices = {};
+  PRODUCTS.forEach(p=>{
+    newLimits[p.key] = parseInt(document.getElementById('limit-'+p.key).value)||0;
+    newPrices[p.key] = parseInt(document.getElementById('price-'+p.key).value)||0;
+  });
+  config.limits = newLimits;
+  config.prices = newPrices;
+  await saveConfig();
+  toast('재고 및 가격 설정이 저장되었습니다.');
+  renderSlices();
+});
+
+function renderAdminOrders(){
+  const wrap = document.getElementById('admin-orders');
+  if(orders.length===0){
+    wrap.innerHTML = '<div class="empty">아직 접수된 주문이 없습니다.</div>';
+    return;
+  }
+  const sorted = [...orders].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+  wrap.innerHTML = sorted.map(o=>`
+    <div class="order-item">
+      <div class="info">
+        <div style="margin-bottom:4px;">
+          <span class="field-tag">동/호수</span> <b>${o.dong}동 ${o.ho}호</b>
+        </div>
+        <div style="margin-bottom:4px;">
+          <span class="field-tag">연락처</span> ${o.phone}
+        </div>
+        <div style="margin-bottom:4px;">
+          <span class="field-tag">주문정보</span> ${o.label} × ${o.qty}개 (${o.total.toLocaleString()}원)
+        </div>
+        <span style="color:var(--ink-soft);font-size:12px;">${o.id} · ${new Date(o.createdAt).toLocaleString('ko-KR')}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <span class="status ${o.confirmed?'paid':'pending'}">${o.confirmed?'입금완료':'입금대기'}</span>
+        <button class="btn ${o.confirmed?'btn-outline':'btn-primary'} btn-small" data-id="${o.id}">
+          ${o.confirmed?'입금대기로 변경':'입금완료 처리'}
+        </button>
+      </div>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('button[data-id]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      await loadData();
+      const target = orders.find(o=>o.id===btn.dataset.id);
+      if(target){
+        target.confirmed = !target.confirmed;
+        await saveOrders();
+        renderAdminOrders();
+        toast(target.confirmed ? '입금완료로 처리했습니다.' : '입금대기로 변경했습니다.');
+      }
+    });
+  });
+}
+
+async function renderAdmin(){
+  await loadData();
+  renderAdminLimits();
+  renderAdminOrders();
+}
+
+// INIT
+(async function init(){
+  await loadData();
+  renderSlices();
+  updateForm();
+})();
+</script>
+</body>
+</html>
