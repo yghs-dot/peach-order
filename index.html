@@ -340,8 +340,8 @@
 
       <div class="row2">
         <div>
-          <label class="field">동 (3자리)</label>
-          <input type="text" id="dong" placeholder="101" inputmode="numeric" maxlength="3">
+          <label class="field">동 (4자리)</label>
+          <input type="text" id="dong" placeholder="1101" inputmode="numeric" maxlength="4">
         </div>
         <div>
           <label class="field">호수 (3~4자리)</label>
@@ -412,8 +412,8 @@
         <input type="number" id="manual-qty" min="1" value="1">
         <div class="row2">
           <div>
-            <label class="field">동 (3자리)</label>
-            <input type="text" id="manual-dong" placeholder="101" inputmode="numeric" maxlength="3">
+            <label class="field">동 (4자리)</label>
+            <input type="text" id="manual-dong" placeholder="1101" inputmode="numeric" maxlength="4">
           </div>
           <div>
             <label class="field">호수 (3~4자리)</label>
@@ -623,7 +623,7 @@ function updateForm(){
   const dong = document.getElementById('dong').value.trim();
   const ho = document.getElementById('ho').value.trim();
   const phone = document.getElementById('phone').value.trim();
-  const dongValid = /^\d{3}$/.test(dong);
+  const dongValid = /^\d{4}$/.test(dong);
   const hoValid = /^\d{3,4}$/.test(ho);
   submitBtn.disabled = !(remaining>0 && qty>0 && dongValid && hoValid && phone);
 }
@@ -642,7 +642,7 @@ document.getElementById('qty-plus').addEventListener('click', ()=>{
   document.getElementById(id).addEventListener('input', updateForm);
 });
 document.getElementById('dong').addEventListener('input', (e)=>{
-  e.target.value = e.target.value.replace(/\D/g,'').slice(0,3);
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
 });
 document.getElementById('ho').addEventListener('input', (e)=>{
   e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
@@ -828,7 +828,7 @@ function renderManualTypeOptions(){
 }
 
 document.getElementById('manual-dong').addEventListener('input', (e)=>{
-  e.target.value = e.target.value.replace(/\D/g,'').slice(0,3);
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
 });
 document.getElementById('manual-ho').addEventListener('input', (e)=>{
   e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
@@ -846,7 +846,7 @@ document.getElementById('manual-add').addEventListener('click', async ()=>{
 
   if(!type){ msg.textContent = '박스 종류를 선택해주세요.'; return; }
   if(qty < 1){ msg.textContent = '수량을 1개 이상 입력해주세요.'; return; }
-  if(!/^\d{3}$/.test(dong)){ msg.textContent = '동은 숫자 3자리로 입력해주세요.'; return; }
+  if(!/^\d{4}$/.test(dong)){ msg.textContent = '동은 숫자 4자리로 입력해주세요.'; return; }
   if(!/^\d{3,4}$/.test(ho)){ msg.textContent = '호수는 숫자 3~4자리로 입력해주세요.'; return; }
   if(!phone){ msg.textContent = '연락처를 입력해주세요.'; return; }
 
