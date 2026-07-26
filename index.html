@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg: #FCF3E7;
@@ -157,7 +158,7 @@
   }
 
   label.field{display:block;margin:14px 0 6px;font-weight:700;font-size:13.5px;color:var(--ink);}
-  input[type=text], input[type=tel], input[type=number], input[type=password]{
+  input[type=text], input[type=tel], input[type=number], input[type=password], select{
     width:100%;
     padding:12px 14px;
     border:1.5px solid var(--line);
@@ -343,8 +344,8 @@
           <input type="text" id="dong" placeholder="101" inputmode="numeric" maxlength="3">
         </div>
         <div>
-          <label class="field">호수 (4자리)</label>
-          <input type="text" id="ho" placeholder="1503" inputmode="numeric" maxlength="4">
+          <label class="field">호수 (3~4자리)</label>
+          <input type="text" id="ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
         </div>
       </div>
       <label class="field">연락처</label>
@@ -401,8 +402,38 @@
       </div>
 
       <div class="card">
+        <h2>주문 직접 등록</h2>
+        <div class="sub">전화·문자 등으로 이미 받은 주문을 여기에 입력하면 재고에서 자동으로 차감되고 주문 목록에 함께 표시돼요.</div>
+        <label class="field">박스 종류</label>
+        <select id="manual-type">
+          <option value="">선택해주세요</option>
+        </select>
+        <label class="field">수량</label>
+        <input type="number" id="manual-qty" min="1" value="1">
+        <div class="row2">
+          <div>
+            <label class="field">동 (3자리)</label>
+            <input type="text" id="manual-dong" placeholder="101" inputmode="numeric" maxlength="3">
+          </div>
+          <div>
+            <label class="field">호수 (3~4자리)</label>
+            <input type="text" id="manual-ho" placeholder="예: 503 또는 1503" inputmode="numeric" maxlength="4">
+          </div>
+        </div>
+        <label class="field">연락처</label>
+        <input type="tel" id="manual-phone" placeholder="010-1234-5678">
+        <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:700;font-size:13.5px;cursor:pointer;">
+          <input type="checkbox" id="manual-confirmed" style="width:auto;">
+          입금 확인 완료된 주문이에요
+        </label>
+        <button class="btn btn-primary" id="manual-add">주문 등록하기</button>
+        <div class="small-note" id="manual-msg"></div>
+      </div>
+
+      <div class="card">
         <h2>주문 목록</h2>
         <div class="sub">입금 확인 후 '입금완료'로 표시해주세요.</div>
+        <button class="btn btn-outline" id="export-excel" style="margin-bottom:16px;">📊 엑셀 파일로 내려받기</button>
         <div id="admin-orders"></div>
       </div>
 
@@ -431,13 +462,13 @@
    "내 앱" 섹션의 SDK 설정 값을 그대로 복사해 붙여넣으면 됩니다.
    ============================================================ */
 const firebaseConfig = {
-     apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-     authDomain: "peach-order-xxxxx.firebaseapp.com",
-     projectId: "peach-order-xxxxx",
-     storageBucket: "peach-order-xxxxx.appspot.com",
-     messagingSenderId: "123456789012",
-     appId: "1:123456789012:web:abcdef1234567890"
-   };
+  apiKey: "AIzaSyAXpBlvSQlAFfPCc-i7JDopCnzM5XKUri8",
+  authDomain: "peach-ordet.firebaseapp.com",
+  projectId: "peach-ordet",
+  storageBucket: "peach-ordet.firebasestorage.app",
+  messagingSenderId: "778939901194",
+  appId: "1:778939901194:web:2533cc27f5dd94beab46f3"
+};
 
 let db = null;
 let firebaseReady = false;
@@ -496,14 +527,25 @@ async function loadData(){
     document.getElementById('setup-banner').style.display = 'block';
     return;
   }
-  try{
-    const c = await CONFIG_DOC().get();
-    if(c.exists) config = c.data();
-  }catch(e){ console.error(e); }
+  const [configResult, ordersResult] = await Promise.allSettled([
+    CONFIG_DOC().get(),
+    ORDERS_DOC().get()
+  ]);
+  if(configResult.status === 'fulfilled' && configResult.value.exists){
+    config = configResult.value.data();
+  }
+  if(ordersResult.status === 'fulfilled' && ordersResult.value.exists){
+    orders = ordersResult.value.data().list || [];
+  }
+}
+
+// 주문 목록만 필요할 때 쓰는 가벼운 버전 (재고/가격 설정은 다시 안 불러와서 더 빠름)
+async function loadOrdersOnly(){
+  if(!firebaseReady) return;
   try{
     const o = await ORDERS_DOC().get();
     if(o.exists) orders = o.data().list || [];
-  }catch(e){ orders = []; console.error(e); }
+  }catch(e){ console.error(e); }
 }
 
 async function saveConfig(){
@@ -582,7 +624,7 @@ function updateForm(){
   const ho = document.getElementById('ho').value.trim();
   const phone = document.getElementById('phone').value.trim();
   const dongValid = /^\d{3}$/.test(dong);
-  const hoValid = /^\d{4}$/.test(ho);
+  const hoValid = /^\d{3,4}$/.test(ho);
   submitBtn.disabled = !(remaining>0 && qty>0 && dongValid && hoValid && phone);
 }
 
@@ -684,7 +726,8 @@ document.getElementById('check-btn').addEventListener('click', async ()=>{
   const phone = document.getElementById('check-phone').value.trim();
   const results = document.getElementById('check-results');
   if(!phone){ toast('연락처를 입력해주세요.'); return; }
-  await loadData();
+  results.innerHTML = '<div class="empty">조회 중...</div>';
+  await loadOrdersOnly();
   const mine = orders.filter(o=>o.phone.replace(/-/g,'') === phone.replace(/-/g,''));
   if(mine.length===0){
     results.innerHTML = '<div class="empty">해당 연락처로 접수된 주문이 없습니다.</div>';
@@ -707,7 +750,8 @@ document.getElementById('admin-login').addEventListener('click', async ()=>{
   const btn = document.getElementById('admin-login');
   btn.disabled = true;
   btn.textContent = '확인 중...';
-  await loadAdminPassword();
+  // 비밀번호 확인과 관리자 데이터 로딩을 동시에 실행해서 대기 시간을 줄임
+  await Promise.all([loadAdminPassword(), loadData()]);
   const pw = document.getElementById('admin-pw').value;
   btn.disabled = false;
   btn.textContent = '로그인';
@@ -715,7 +759,7 @@ document.getElementById('admin-login').addEventListener('click', async ()=>{
     document.getElementById('admin-error').style.display='none';
     document.getElementById('admin-lock').style.display='none';
     document.getElementById('admin-content').style.display='block';
-    renderAdmin();
+    renderAdmin(true); // 데이터는 이미 불러온 상태라 다시 불러오지 않음
   }else{
     document.getElementById('admin-error').style.display='block';
   }
@@ -773,6 +817,85 @@ function renderAdminLimits(){
   `).join('');
 }
 
+function renderManualTypeOptions(){
+  const sel = document.getElementById('manual-type');
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="">선택해주세요</option>' + PRODUCTS.map(p=>{
+    const remaining = remainingFor(p.key);
+    return `<option value="${p.key}">${p.label} · ${getPrice(p.key).toLocaleString()}원 (남은 ${remaining}개)</option>`;
+  }).join('');
+  if(prevValue) sel.value = prevValue;
+}
+
+document.getElementById('manual-dong').addEventListener('input', (e)=>{
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,3);
+});
+document.getElementById('manual-ho').addEventListener('input', (e)=>{
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
+});
+
+document.getElementById('manual-add').addEventListener('click', async ()=>{
+  const msg = document.getElementById('manual-msg');
+  msg.style.color = 'var(--danger)';
+  const type = document.getElementById('manual-type').value;
+  const qty = parseInt(document.getElementById('manual-qty').value)||0;
+  const dong = document.getElementById('manual-dong').value.trim();
+  const ho = document.getElementById('manual-ho').value.trim();
+  const phone = document.getElementById('manual-phone').value.trim();
+  const confirmed = document.getElementById('manual-confirmed').checked;
+
+  if(!type){ msg.textContent = '박스 종류를 선택해주세요.'; return; }
+  if(qty < 1){ msg.textContent = '수량을 1개 이상 입력해주세요.'; return; }
+  if(!/^\d{3}$/.test(dong)){ msg.textContent = '동은 숫자 3자리로 입력해주세요.'; return; }
+  if(!/^\d{3,4}$/.test(ho)){ msg.textContent = '호수는 숫자 3~4자리로 입력해주세요.'; return; }
+  if(!phone){ msg.textContent = '연락처를 입력해주세요.'; return; }
+
+  const btn = document.getElementById('manual-add');
+  btn.disabled = true;
+  btn.textContent = '등록 중...';
+
+  // 최신 주문 목록을 다시 불러와 재고를 정확히 계산
+  await loadOrdersOnly();
+  const remaining = remainingFor(type);
+  if(qty > remaining){
+    msg.textContent = `남은 재고(${remaining}개)보다 많은 수량입니다.`;
+    btn.disabled = false;
+    btn.textContent = '주문 등록하기';
+    renderManualTypeOptions();
+    return;
+  }
+
+  const p = PRODUCTS.find(x=>x.key===type);
+  const order = {
+    id: 'ORD' + Date.now().toString(36).toUpperCase(),
+    type,
+    label: p.label,
+    unitPrice: getPrice(type),
+    qty,
+    total: qty*getPrice(type),
+    dong, ho, phone,
+    confirmed,
+    createdAt: new Date().toISOString(),
+  };
+  orders.push(order);
+  await saveOrders();
+
+  msg.style.color = 'var(--leaf-dark)';
+  msg.textContent = '주문이 등록되었습니다.';
+  document.getElementById('manual-type').value = '';
+  document.getElementById('manual-qty').value = 1;
+  document.getElementById('manual-dong').value = '';
+  document.getElementById('manual-ho').value = '';
+  document.getElementById('manual-phone').value = '';
+  document.getElementById('manual-confirmed').checked = false;
+  btn.disabled = false;
+  btn.textContent = '주문 등록하기';
+  renderManualTypeOptions();
+  renderAdminOrders();
+  renderSlices();
+  toast('주문이 등록되었습니다.');
+});
+
 document.getElementById('save-limits').addEventListener('click', async ()=>{
   const newLimits = {};
   const newPrices = {};
@@ -785,6 +908,49 @@ document.getElementById('save-limits').addEventListener('click', async ()=>{
   await saveConfig();
   toast('재고 및 가격 설정이 저장되었습니다.');
   renderSlices();
+  renderManualTypeOptions();
+});
+
+document.getElementById('export-excel').addEventListener('click', async ()=>{
+  const btn = document.getElementById('export-excel');
+  btn.disabled = true;
+  btn.textContent = '만드는 중...';
+  await loadOrdersOnly();
+
+  if(orders.length === 0){
+    toast('내려받을 주문이 없습니다.');
+    btn.disabled = false;
+    btn.textContent = '📊 엑셀 파일로 내려받기';
+    return;
+  }
+
+  const sorted = [...orders].sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+  const rows = sorted.map(o=>({
+    '주문번호': o.id,
+    '동': o.dong,
+    '호수': o.ho,
+    '연락처': o.phone,
+    '박스종류': o.label,
+    '수량': o.qty,
+    '단가': o.unitPrice,
+    '결제금액': o.total,
+    '입금상태': o.confirmed ? '입금완료' : '입금대기',
+    '접수일시': new Date(o.createdAt).toLocaleString('ko-KR'),
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    {wch:14},{wch:6},{wch:8},{wch:15},{wch:10},
+    {wch:6},{wch:10},{wch:10},{wch:10},{wch:20}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '주문목록');
+
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `복숭아주문목록_${today}.xlsx`);
+
+  btn.disabled = false;
+  btn.textContent = '📊 엑셀 파일로 내려받기';
 });
 
 function renderAdminOrders(){
@@ -818,7 +984,7 @@ function renderAdminOrders(){
   `).join('');
   wrap.querySelectorAll('button[data-id]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
-      await loadData();
+      await loadOrdersOnly();
       const target = orders.find(o=>o.id===btn.dataset.id);
       if(target){
         target.confirmed = !target.confirmed;
@@ -830,10 +996,11 @@ function renderAdminOrders(){
   });
 }
 
-async function renderAdmin(){
-  await loadData();
+async function renderAdmin(skipReload){
+  if(!skipReload) await loadData();
   renderAdminLimits();
   renderAdminOrders();
+  renderManualTypeOptions();
 }
 
 // INIT
