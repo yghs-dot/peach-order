@@ -1579,6 +1579,8 @@ function renderAdminStats(){
   `;
 }
 
+let editingOrderId = null; // 수정 중인 주문의 id (없으면 null)
+
 function renderAdminOrders(){
   renderAdminStats();
   renderProductQtySummaries();
@@ -1594,7 +1596,42 @@ function renderAdminOrders(){
     return;
   }
   const sorted = [...sourceList].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+
   wrap.innerHTML = sorted.map(o=>{
+    if(o.id === editingOrderId){
+      const typeOptions = PRODUCTS.map(p=>
+        `<option value="${p.key}" ${p.key===o.type?'selected':''}>${p.label} (${getPrice(p.key).toLocaleString()}원)</option>`
+      ).join('');
+      return `
+      <div class="order-item" style="flex-direction:column;align-items:stretch;">
+        <div style="font-weight:800;margin-bottom:10px;">주문 수정 · ${o.id}</div>
+        <label class="field">박스 종류</label>
+        <select class="edit-type" data-id="${o.id}">${typeOptions}</select>
+        <label class="field">수량</label>
+        <input type="number" class="edit-qty" data-id="${o.id}" min="1" value="${o.qty}">
+        <label class="field">이름</label>
+        <input type="text" class="edit-name" data-id="${o.id}" value="${o.name || ''}" placeholder="홍길동">
+        <div class="row2">
+          <div>
+            <label class="field">동</label>
+            <input type="text" class="edit-dong" data-id="${o.id}" value="${o.dong || ''}" inputmode="numeric" maxlength="4">
+          </div>
+          <div>
+            <label class="field">호수</label>
+            <input type="text" class="edit-ho" data-id="${o.id}" value="${o.ho || ''}" inputmode="numeric" maxlength="4">
+          </div>
+        </div>
+        <label class="field">연락처</label>
+        <input type="tel" class="edit-phone" data-id="${o.id}" value="${o.phone || ''}" placeholder="010-1234-5678">
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button class="btn btn-primary btn-small" data-id="${o.id}" data-action="save-edit" style="flex:1;">저장</button>
+          <button class="btn btn-outline btn-small" data-id="${o.id}" data-action="cancel-edit" style="flex:1;">취소</button>
+        </div>
+        <div class="small-note" data-msg-for="${o.id}"></div>
+      </div>
+    `;
+    }
+
     const phoneLink = o.phone
       ? `<a href="tel:${o.phone.replace(/[^0-9+]/g,'')}" style="color:inherit;text-decoration:underline;">${o.phone}</a>`
       : '입력안함';
@@ -1626,10 +1663,13 @@ function renderAdminOrders(){
         <button class="btn ${o.delivered?'btn-outline':'btn-primary'} btn-small" data-id="${o.id}" data-action="deliver">
           ${o.delivered?'전달대기로 변경':'전달완료 처리'}
         </button>
+        <button class="btn btn-outline btn-small" data-id="${o.id}" data-action="edit">수정</button>
+        <button class="btn btn-small" data-id="${o.id}" data-action="delete" style="color:var(--danger);border:1.5px solid var(--danger);background:transparent;">삭제</button>
       </div>
     </div>
   `;
   }).join('');
+
   wrap.querySelectorAll('button[data-action="confirm"]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       await loadOrdersOnly();
@@ -1652,6 +1692,95 @@ function renderAdminOrders(){
         renderAdminOrders();
         toast(target.delivered ? '전달완료로 처리했습니다.' : '전달대기로 변경했습니다.');
       }
+    });
+  });
+
+  // 수정 시작
+  wrap.querySelectorAll('button[data-action="edit"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      editingOrderId = btn.dataset.id;
+      renderAdminOrders();
+    });
+  });
+
+  // 수정 취소
+  wrap.querySelectorAll('button[data-action="cancel-edit"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      editingOrderId = null;
+      renderAdminOrders();
+    });
+  });
+
+  // 동/호수는 숫자만 입력되도록 제한
+  wrap.querySelectorAll('.edit-dong').forEach(el=>{
+    el.addEventListener('input', ()=>{ el.value = el.value.replace(/\D/g,'').slice(0,4); });
+  });
+  wrap.querySelectorAll('.edit-ho').forEach(el=>{
+    el.addEventListener('input', ()=>{ el.value = el.value.replace(/\D/g,'').slice(0,4); });
+  });
+
+  // 수정 저장
+  wrap.querySelectorAll('button[data-action="save-edit"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      const msgEl = wrap.querySelector(`[data-msg-for="${id}"]`);
+      const type = wrap.querySelector(`.edit-type[data-id="${id}"]`).value;
+      const qty = parseInt(wrap.querySelector(`.edit-qty[data-id="${id}"]`).value) || 0;
+      const name = wrap.querySelector(`.edit-name[data-id="${id}"]`).value.trim();
+      const dong = wrap.querySelector(`.edit-dong[data-id="${id}"]`).value.trim();
+      const ho = wrap.querySelector(`.edit-ho[data-id="${id}"]`).value.trim();
+      const phone = wrap.querySelector(`.edit-phone[data-id="${id}"]`).value.trim();
+
+      if(qty < 1){ msgEl.style.color='var(--danger)'; msgEl.textContent = '수량을 1개 이상 입력해주세요.'; return; }
+      const hasDongHo = dong && ho;
+      if(!name && !hasDongHo){ msgEl.style.color='var(--danger)'; msgEl.textContent = '동+호수 또는 이름 중 하나는 반드시 입력해주세요.'; return; }
+      if(hasDongHo && !phone){ msgEl.style.color='var(--danger)'; msgEl.textContent = '동+호수를 입력한 경우 연락처는 필수입니다.'; return; }
+
+      await loadOrdersOnly();
+      const target = orders.find(o=>o.id===id);
+      if(!target){ msgEl.style.color='var(--danger)'; msgEl.textContent = '주문을 찾을 수 없습니다. 새로고침 후 다시 시도해주세요.'; return; }
+
+      // 재고 확인: 같은 주문 자신의 기존 수량은 제외하고 계산
+      const otherUsed = orders.filter(o=>o.type===type && o.id!==id).reduce((s,o)=>s+o.qty,0);
+      const p = PRODUCTS.find(x=>x.key===type);
+      const limit = p ? (p.limit||0) : 0;
+      const remainingForOthers = Math.max(0, limit - otherUsed);
+      if(qty > remainingForOthers){
+        msgEl.style.color='var(--danger)';
+        msgEl.textContent = `재고가 부족합니다. (이 주문 제외 남은 수량: ${remainingForOthers}개)`;
+        return;
+      }
+
+      target.type = type;
+      target.label = p ? p.label : target.label;
+      target.unitPrice = getPrice(type);
+      target.qty = qty;
+      target.total = qty * getPrice(type);
+      target.name = name;
+      target.dong = dong;
+      target.ho = ho;
+      target.phone = phone;
+
+      await saveOrders();
+      editingOrderId = null;
+      renderAdminOrders();
+      renderSlices();
+      toast('주문 정보가 수정되었습니다.');
+    });
+  });
+
+  // 삭제
+  wrap.querySelectorAll('button[data-action="delete"]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.id;
+      if(!confirm('이 주문을 삭제하시겠어요? 삭제하면 되돌릴 수 없습니다.')) return;
+      await loadOrdersOnly();
+      orders = orders.filter(o=>o.id !== id);
+      await saveOrders();
+      if(editingOrderId === id) editingOrderId = null;
+      renderAdminOrders();
+      renderSlices();
+      toast('주문이 삭제되었습니다.');
     });
   });
 }
