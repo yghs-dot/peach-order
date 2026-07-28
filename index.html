@@ -348,6 +348,12 @@
     <b>⚠️ 설정이 필요해요</b>
     이 웹앱은 Firebase(무료 데이터 저장소) 연결이 되어야 작동합니다. 코드 상단의 <code>firebaseConfig</code> 부분을 본인의 Firebase 프로젝트 키로 채워주세요. 자세한 방법은 앱 제공자(관리자)에게 문의해주세요.
   </div>
+
+  <div class="card" id="notice-card" style="display:none;background:#FFF8EC;border-color:#F0DDB8;">
+    <h2 style="font-size:16px;display:flex;align-items:center;gap:6px;">📢 공지사항</h2>
+    <div id="notice-content" style="white-space:pre-wrap;font-size:16.8px;line-height:1.7;color:var(--ink);"></div>
+  </div>
+
   <div class="tabs">
     <div class="tab active" data-tab="order">주문하기</div>
     <div class="tab" data-tab="check">주문 조회</div>
@@ -401,8 +407,9 @@
       <div class="notice">주문 접수 후에도 결제(입금)가 확인되어야 최종 확정돼요. 아래 계좌로 입금해주세요.</div>
       <div class="account-box">
         <div>
-          <div class="bank">농협 · 예금주 확인 후 입금</div>
-          <div class="num">150142-56-046199</div>
+          <div class="bank"><span id="display-bank-name">새마을금고</span></div>
+          <div class="bank">예금주 : <span id="display-depositor-name">조동욱</span></div>
+          <div class="num">계좌번호 : <span id="display-account-number">3827-10-048415-4</span></div>
         </div>
         <button class="copy-btn" id="copy-account">계좌복사</button>
       </div>
@@ -427,8 +434,8 @@
       </div>
       <label class="field">연락처</label>
       <input type="tel" id="check-phone" placeholder="010-1234-5678">
-      <div class="notice" style="margin-top:14px;">연락처가 없는 주문이라면, 위 칸은 비워두고 아래 이름만 입력해주세요.</div>
-      <label class="field">이름 (연락처가 없을 때만 사용)</label>
+      <div class="notice" style="margin-top:14px;">주문시, 동+호수를 입력하지 않은 경우 이름을 입력하여 주문 조회를 할 수 있습니다.</div>
+      <label class="field">이름 (주문 시 동+호수를 입력하지 않은 경우 이름만으로 조회 가능)</label>
       <input type="text" id="check-name" placeholder="홍길동" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
       <button class="btn btn-outline" id="check-btn">조회하기</button>
@@ -453,11 +460,14 @@
     <div id="admin-content" style="display:none;">
       <div class="tabs" style="flex-wrap:wrap;height:auto;">
         <div class="admin-tab tab active" data-admin-tab="stats">통계</div>
+        <div class="admin-tab tab" data-admin-tab="notice">공지사항</div>
         <div class="admin-tab tab" data-admin-tab="lookup">주문 조회</div>
         <div class="admin-tab tab" data-admin-tab="list">주문 목록</div>
         <div class="admin-tab tab" data-admin-tab="register">주문 등록</div>
         <div class="admin-tab tab" data-admin-tab="fix">데이터 정정</div>
         <div class="admin-tab tab" data-admin-tab="pw">비밀번호</div>
+        <div class="admin-tab tab" data-admin-tab="account">계좌 정보</div>
+        <div class="admin-tab tab" data-admin-tab="sms">문자 발송</div>
         <div class="admin-tab tab" data-admin-tab="products">상품 관리</div>
       </div>
 
@@ -466,6 +476,20 @@
           <h2>주문 통계</h2>
           <div class="sub">전체 주문 현황을 한눈에 확인하세요. 목록이나 검색 결과와 무관하게 항상 전체 기준으로 집계돼요.</div>
           <div id="admin-stats"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-notice" style="display:none;">
+        <div class="card">
+          <h2>공지사항 관리</h2>
+          <div class="sub">주문 화면 맨 위에 표시될 공지사항이에요. 비워두고 저장하면 공지가 화면에서 사라져요.</div>
+          <label class="field">공지사항 내용</label>
+          <textarea id="notice-input" placeholder="예: 이번 주 배송은 금요일에 진행됩니다. 참고해주세요!" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;resize:vertical;min-height:120px;box-sizing:border-box;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn btn-primary" id="save-notice" style="flex:1;">공지사항 저장</button>
+            <button class="btn btn-outline" id="delete-notice" style="flex:1;color:var(--danger);border-color:var(--danger);">공지사항 삭제</button>
+          </div>
+          <div class="small-note" id="notice-msg"></div>
         </div>
       </div>
 
@@ -596,6 +620,55 @@
         </div>
       </div>
 
+      <div class="admin-subpanel" id="admin-sub-account" style="display:none;">
+        <div class="card">
+          <h2>계좌 정보</h2>
+          <div class="sub">손님에게 안내되는 입금 계좌 정보예요. 여기서 수정하면 주문 화면과 주문 완료 안내에 바로 반영돼요.</div>
+          <label class="field">은행명</label>
+          <input type="text" id="account-bank-input" placeholder="예: 새마을금고" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <label class="field">예금주</label>
+          <input type="text" id="account-depositor-input" placeholder="예: 조동욱" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <label class="field">계좌번호</label>
+          <input type="text" id="account-number-input" placeholder="예: 3827-10-048415-4" autocomplete="off">
+          <button class="btn btn-primary" id="save-account">계좌 정보 저장</button>
+          <div class="small-note" id="account-msg"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-sms" style="display:none;">
+        <div class="card">
+          <h2>문자 발송</h2>
+          <div class="sub">주문자에게 안내 문자를 보낼 수 있어요. 브라우저 보안상 완전 자동 대량발송은 지원하지 않고, 아래에서 대상을 고른 뒤 한 분씩 문자 앱이 열리면 확인하고 보내는 방식이에요. 개별로 한 명씩 바로 보낼 수도 있어요.</div>
+          <div class="notice">문구 안에 <b>{이름}</b> <b>{동}</b> <b>{호수}</b> <b>{상품}</b> <b>{수량}</b>을 넣으면 받는 사람마다 자동으로 바뀌어요. 아래 대상 목록에서 각 사람에게 실제로 어떤 문구가 가는지 미리 확인할 수 있어요.</div>
+          <label class="field">문자 내용</label>
+          <textarea id="sms-message" placeholder="예: {이름}님, 주문하신 {상품} {수량}개 준비 완료되어 오늘 오후에 전달드릴 예정입니다. 감사합니다!" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;resize:vertical;min-height:100px;box-sizing:border-box;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+
+          <div style="display:flex;gap:8px;margin:14px 0;">
+            <button class="btn btn-outline btn-small" id="sms-select-all" type="button" style="flex:1;">전체 선택</button>
+            <button class="btn btn-outline btn-small" id="sms-select-none" type="button" style="flex:1;">전체 해제</button>
+          </div>
+          <div id="sms-recipient-list"></div>
+
+          <div class="notice" style="margin-top:14px;">
+            <b>동시 발송</b>: 선택한 번호를 한 번에 문자 앱에 담아 <b>한 번만 보내면 전원에게 전달</b>돼요. 다만 모두 같은 문구를 받기 때문에 {이름} 등 맞춤 문구는 적용되지 않아요.<br>
+            <b>순차 발송</b>: 한 명씩 개인 맞춤 문구({이름} 등 적용)로 보낼 수 있지만, 한 명 한 명 직접 눌러서 보내야 해요.
+          </div>
+          <button class="btn btn-primary" id="sms-start-simultaneous" type="button" style="margin-top:10px;">선택한 대상에게 동시 문자 보내기 (그룹 문자)</button>
+          <button class="btn btn-outline" id="sms-start-sequence" type="button" style="margin-top:8px;">선택한 대상에게 순차 발송 시작 (맞춤 문구 적용)</button>
+          <div class="small-note" id="sms-msg"></div>
+
+          <div id="sms-progress" style="display:none;margin-top:16px;padding:16px;background:#FBF1E6;border-radius:12px;">
+            <div style="font-weight:800;margin-bottom:8px;" id="sms-progress-label"></div>
+            <div style="font-size:13.5px;margin-bottom:10px;color:var(--ink-soft);" id="sms-progress-preview"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary btn-small" id="sms-open-app" type="button" style="flex:1;">문자 앱 열기</button>
+              <button class="btn btn-outline btn-small" id="sms-next" type="button" style="flex:1;">다음 사람</button>
+              <button class="btn btn-small" id="sms-cancel" type="button" style="flex:1;color:var(--danger);border:1.5px solid var(--danger);background:transparent;">종료</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="admin-subpanel" id="admin-sub-products" style="display:none;">
         <div class="card">
           <h2>상품 관리</h2>
@@ -686,6 +759,57 @@ let config = {};
 let orders = [];
 let selectedType = null;
 
+// 계좌 정보 - Firebase config에 저장된 값이 있으면 그걸 쓰고, 없으면 아래 기본값을 사용
+let bankName = '새마을금고';
+let depositorName = '조동욱';
+let accountNumber = '3827-10-048415-4';
+let noticeText = '';
+
+function syncBankInfoFromConfig(){
+  if(config.bankName) bankName = config.bankName;
+  if(config.depositorName) depositorName = config.depositorName;
+  if(config.accountNumber) accountNumber = config.accountNumber;
+  renderBankInfo();
+}
+
+function syncNoticeFromConfig(){
+  noticeText = config.notice || '';
+  renderNotice();
+}
+
+function renderNotice(){
+  const card = document.getElementById('notice-card');
+  const content = document.getElementById('notice-content');
+  const adminPanel = document.getElementById('panel-admin');
+  const isAdminActive = adminPanel && adminPanel.classList.contains('active');
+
+  if(card && content){
+    if(!isAdminActive && noticeText.trim()){
+      content.textContent = noticeText;
+      card.style.display = 'block';
+    }else{
+      card.style.display = 'none';
+    }
+  }
+  const noticeInput = document.getElementById('notice-input');
+  if(noticeInput) noticeInput.value = noticeText;
+}
+
+function renderBankInfo(){
+  const bankEl = document.getElementById('display-bank-name');
+  const depositorEl = document.getElementById('display-depositor-name');
+  const numEl = document.getElementById('display-account-number');
+  if(bankEl) bankEl.textContent = bankName;
+  if(depositorEl) depositorEl.textContent = depositorName;
+  if(numEl) numEl.textContent = accountNumber;
+  const bankInput = document.getElementById('account-bank-input');
+  const depositorInput = document.getElementById('account-depositor-input');
+  const numInput = document.getElementById('account-number-input');
+  if(bankInput) bankInput.value = bankName;
+  if(depositorInput) depositorInput.value = depositorName;
+  if(numInput) numInput.value = accountNumber;
+}
+
 // config.products가 있으면 그걸 기준으로 PRODUCTS를 동기화하고,
 // 없으면(예전 데이터 형식) config.limits/config.prices 또는 기본값으로부터 마이그레이션합니다.
 function syncProductsFromConfig(){
@@ -729,6 +853,8 @@ async function loadData(){
     orders = ordersResult.value.data().list || [];
   }
   syncProductsFromConfig();
+  syncBankInfoFromConfig();
+  syncNoticeFromConfig();
 }
 
 // 주문 목록만 필요할 때 쓰는 가벼운 버전 (재고/가격 설정은 다시 안 불러와서 더 빠름)
@@ -980,11 +1106,11 @@ document.getElementById('submit-order').addEventListener('click', async ()=>{
   updateForm();
   btn.textContent = '주문 접수하기';
   toast(`주문이 접수되었습니다! 주문번호 ${order.id}`);
-  alert(`주문이 접수되었습니다.\n\n주문번호: ${order.id}\n${order.label} × ${order.qty}\n결제금액: ${order.total.toLocaleString()}원\n\n농협 150142-56-046199 (예금주 확인)\n위 계좌로 입금해주시면 확인 후 발송해드립니다.\n입금 확인 여부는 '입금확인 조회' 탭에서 연락처, 동+호수, 이름 중 편한 방법으로 조회하실 수 있어요.`);
+  alert(`주문이 접수되었습니다.\n\n주문번호: ${order.id}\n${order.label} × ${order.qty}\n결제금액: ${order.total.toLocaleString()}원\n\n${bankName}\n예금주 : ${depositorName}\n계좌번호 : ${accountNumber}\n\n위 계좌로 입금해주시면 확인 후 발송해드립니다.\n입금 확인 여부는 '입금확인 조회' 탭에서 연락처, 동+호수, 이름 중 편한 방법으로 조회하실 수 있어요.`);
 });
 
 document.getElementById('copy-account').addEventListener('click', ()=>{
-  const text = '150142-56-046199';
+  const text = accountNumber;
   if(navigator.clipboard){
     navigator.clipboard.writeText(text).then(()=>toast('계좌번호가 복사되었습니다.'));
   }else{
@@ -999,6 +1125,9 @@ document.querySelectorAll('.tab[data-tab]').forEach(tab=>{
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+
+    // renderNotice()가 관리자 화면인지 스스로 판단해서 공지사항 표시 여부를 결정함
+    renderNotice();
   });
 });
 
@@ -1118,6 +1247,77 @@ document.getElementById('save-pw').addEventListener('click', async ()=>{
   }catch(e){
     msg.textContent = '저장 중 오류가 발생했습니다. 다시 시도해주세요.';
   }
+});
+
+document.getElementById('save-account').addEventListener('click', async ()=>{
+  const msg = document.getElementById('account-msg');
+  const newBank = document.getElementById('account-bank-input').value.trim();
+  const newDepositor = document.getElementById('account-depositor-input').value.trim();
+  const newNumber = document.getElementById('account-number-input').value.trim();
+
+  if(!newBank || !newDepositor || !newNumber){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '은행명, 예금주, 계좌번호를 모두 입력해주세요.';
+    return;
+  }
+
+  const btn = document.getElementById('save-account');
+  btn.disabled = true;
+  btn.textContent = '저장 중...';
+
+  config.bankName = newBank;
+  config.depositorName = newDepositor;
+  config.accountNumber = newNumber;
+  await saveConfig();
+  bankName = newBank;
+  depositorName = newDepositor;
+  accountNumber = newNumber;
+  renderBankInfo();
+
+  msg.style.color = 'var(--leaf-dark)';
+  msg.textContent = '계좌 정보가 저장되었습니다.';
+  btn.disabled = false;
+  btn.textContent = '계좌 정보 저장';
+  toast('계좌 정보가 저장되었습니다.');
+});
+
+document.getElementById('save-notice').addEventListener('click', async ()=>{
+  const msg = document.getElementById('notice-msg');
+  const btn = document.getElementById('save-notice');
+  const text = document.getElementById('notice-input').value;
+
+  btn.disabled = true;
+  btn.textContent = '저장 중...';
+
+  config.notice = text;
+  await saveConfig();
+  noticeText = text;
+  renderNotice();
+
+  msg.style.color = 'var(--leaf-dark)';
+  msg.textContent = text.trim() ? '공지사항이 저장되었습니다.' : '공지사항이 비어있어 화면에 표시되지 않습니다.';
+  btn.disabled = false;
+  btn.textContent = '공지사항 저장';
+  toast('공지사항이 저장되었습니다.');
+});
+
+document.getElementById('delete-notice').addEventListener('click', async ()=>{
+  if(!confirm('공지사항을 삭제하시겠어요?')) return;
+  const msg = document.getElementById('notice-msg');
+  const btn = document.getElementById('delete-notice');
+  btn.disabled = true;
+  btn.textContent = '삭제 중...';
+
+  config.notice = '';
+  await saveConfig();
+  noticeText = '';
+  renderNotice();
+
+  msg.style.color = 'var(--leaf-dark)';
+  msg.textContent = '공지사항이 삭제되었습니다.';
+  btn.disabled = false;
+  btn.textContent = '공지사항 삭제';
+  toast('공지사항이 삭제되었습니다.');
 });
 
 function productRowHTML(key, label, price, limit){
@@ -1536,6 +1736,193 @@ function renderProductQtySummaries(){
   targets.forEach(el=> el.innerHTML = html);
 }
 
+// ===== 문자 발송 =====
+
+function personalizeMessage(template, o){
+  return (template || '')
+    .replace(/\{이름\}/g, o.name || '고객')
+    .replace(/\{동\}/g, o.dong || '')
+    .replace(/\{호수\}/g, o.ho || '')
+    .replace(/\{상품\}/g, o.label || '')
+    .replace(/\{수량\}/g, o.qty != null ? String(o.qty) : '');
+}
+
+// 문자 내용 입력란에 타이핑할 때마다 각 수신자별 미리보기를 실시간으로 갱신
+function updateSmsPreviews(){
+  const template = document.getElementById('sms-message').value;
+  document.querySelectorAll('.sms-preview').forEach(el=>{
+    const o = orders.find(x=>x.id===el.dataset.id);
+    if(!o) return;
+    el.textContent = template.trim() ? personalizeMessage(template, o) : '문자 내용을 입력하면 여기에 미리보기가 표시돼요.';
+  });
+}
+
+const smsMessageEl = document.getElementById('sms-message');
+if(smsMessageEl){
+  smsMessageEl.addEventListener('input', updateSmsPreviews);
+}
+
+function buildSmsLink(phone, message){
+  const digits = (phone || '').replace(/[^0-9+]/g,'');
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const sep = isIOS ? '&' : '?';
+  return `sms:${digits}${sep}body=${encodeURIComponent(message)}`;
+}
+
+// 여러 명에게 같은 문구를 한 번에 보낼 때 쓰는 링크 (전화번호를 콤마로 나열)
+function buildSmsLinkMultiple(phones, message){
+  const digitsList = phones.map(p=> (p || '').replace(/[^0-9+]/g,'')).filter(Boolean);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const sep = isIOS ? '&' : '?';
+  return `sms:${digitsList.join(',')}${sep}body=${encodeURIComponent(message)}`;
+}
+
+// 동시 발송은 한 사람마다 다른 문구를 넣을 수 없으므로, 맞춤 문구 토큰을 일반적인 표현으로 정리
+function stripPersonalizationTokens(template){
+  return (template || '')
+    .replace(/\{이름\}/g, '고객')
+    .replace(/\{동\}/g, '')
+    .replace(/\{호수\}/g, '')
+    .replace(/\{상품\}/g, '')
+    .replace(/\{수량\}/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+function renderSmsRecipientList(){
+  const wrap = document.getElementById('sms-recipient-list');
+  if(!wrap) return;
+
+  const withPhone = orders.filter(o=>o.phone);
+  if(withPhone.length===0){
+    wrap.innerHTML = '<div class="empty">연락처가 등록된 주문이 없습니다.</div>';
+    return;
+  }
+  const sorted = [...withPhone].sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt));
+
+  wrap.innerHTML = sorted.map(o=>`
+    <div class="order-item" style="align-items:flex-start;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px;cursor:pointer;">
+        <input type="checkbox" class="sms-check" data-id="${o.id}" style="width:auto;transform:scale(1.3);">
+        <span class="info" style="font-size:13.5px;">
+          <b>${o.name || '이름없음'}</b> · ${o.dong && o.ho ? `${o.dong}동 ${o.ho}호` : '동/호수 없음'}<br>
+          <a href="javascript:void(0)" class="sms-phone-link" data-id="${o.id}" style="color:var(--coral-dark);text-decoration:underline;font-weight:700;">${o.phone}</a> · ${o.label} × ${o.qty}개
+        </span>
+      </label>
+      <button class="btn btn-outline btn-small" data-id="${o.id}" data-action="sms-single" type="button">문자 보내기</button>
+      <div class="sms-preview" data-id="${o.id}" style="width:100%;margin-top:8px;padding:8px 10px;background:#F7F1E8;border-radius:8px;font-size:12.5px;color:var(--ink-soft);white-space:pre-wrap;"></div>
+    </div>
+  `).join('');
+
+  updateSmsPreviews();
+
+  function openSmsFor(orderId){
+    const o = orders.find(x=>x.id===orderId);
+    if(!o) return;
+    const template = document.getElementById('sms-message').value;
+    // 문구를 안 써도 문자 앱은 열어서, 앱에서 바로 직접 입력할 수 있도록 함
+    const msg = template.trim() ? personalizeMessage(template, o) : '';
+    window.location.href = buildSmsLink(o.phone, msg);
+  }
+
+  wrap.querySelectorAll('button[data-action="sms-single"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openSmsFor(btn.dataset.id));
+  });
+
+  // 전화번호 자체를 클릭해도 바로 문자 앱이 열리도록 (체크박스 토글에는 영향 없게 처리)
+  wrap.querySelectorAll('.sms-phone-link').forEach(link=>{
+    link.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      openSmsFor(link.dataset.id);
+    });
+  });
+}
+
+document.getElementById('sms-select-all').addEventListener('click', ()=>{
+  document.querySelectorAll('.sms-check').forEach(cb=> cb.checked = true);
+});
+document.getElementById('sms-select-none').addEventListener('click', ()=>{
+  document.querySelectorAll('.sms-check').forEach(cb=> cb.checked = false);
+});
+
+let smsQueue = [];
+let smsQueueIndex = 0;
+
+function renderSmsProgress(){
+  const panel = document.getElementById('sms-progress');
+  const label = document.getElementById('sms-progress-label');
+  const preview = document.getElementById('sms-progress-preview');
+
+  if(smsQueueIndex >= smsQueue.length){
+    label.textContent = `발송 완료 (${smsQueue.length}명)`;
+    preview.textContent = '순차 발송을 모두 마쳤습니다. 종료를 눌러 닫아주세요.';
+    document.getElementById('sms-open-app').style.display = 'none';
+    document.getElementById('sms-next').style.display = 'none';
+    return;
+  }
+  const o = smsQueue[smsQueueIndex];
+  const template = document.getElementById('sms-message').value;
+  const msg = personalizeMessage(template, o);
+  label.textContent = `${smsQueueIndex+1} / ${smsQueue.length} · ${o.name || '이름없음'} (${o.phone})`;
+  preview.textContent = msg;
+  document.getElementById('sms-open-app').style.display = 'inline-block';
+  document.getElementById('sms-next').style.display = 'inline-block';
+  panel.style.display = 'block';
+}
+
+document.getElementById('sms-start-simultaneous').addEventListener('click', ()=>{
+  const template = document.getElementById('sms-message').value;
+  if(!template.trim()){ toast('문자 내용을 먼저 입력해주세요.'); return; }
+
+  const ids = [...document.querySelectorAll('.sms-check:checked')].map(cb=>cb.dataset.id);
+  if(ids.length===0){ toast('문자를 보낼 대상을 최소 1명 선택해주세요.'); return; }
+
+  const selectedOrders = ids.map(id=>orders.find(o=>o.id===id)).filter(Boolean);
+  const phones = [...new Set(selectedOrders.map(o=>o.phone).filter(Boolean))];
+  if(phones.length===0){ toast('선택한 대상 중 연락처가 있는 사람이 없습니다.'); return; }
+
+  const hasTokens = /\{(이름|동|호수|상품|수량)\}/.test(template);
+  let finalMessage = template;
+  if(hasTokens){
+    const ok = confirm('동시 발송은 모든 사람에게 같은 문구가 전달돼서, {이름}처럼 사람마다 다른 맞춤 문구는 적용되지 않아요. 해당 부분을 지우고 계속 보내시겠어요?');
+    if(!ok) return;
+    finalMessage = stripPersonalizationTokens(template);
+  }
+
+  window.location.href = buildSmsLinkMultiple(phones, finalMessage);
+  toast(`${phones.length}명에게 보낼 문자 앱을 열었습니다.`);
+});
+
+document.getElementById('sms-start-sequence').addEventListener('click', ()=>{
+  const template = document.getElementById('sms-message').value;
+  if(!template.trim()){ toast('문자 내용을 먼저 입력해주세요.'); return; }
+  const ids = [...document.querySelectorAll('.sms-check:checked')].map(cb=>cb.dataset.id);
+  if(ids.length===0){ toast('문자를 보낼 대상을 최소 1명 선택해주세요.'); return; }
+  smsQueue = ids.map(id=>orders.find(o=>o.id===id)).filter(Boolean);
+  smsQueueIndex = 0;
+  renderSmsProgress();
+});
+
+document.getElementById('sms-open-app').addEventListener('click', ()=>{
+  if(smsQueueIndex >= smsQueue.length) return;
+  const o = smsQueue[smsQueueIndex];
+  const template = document.getElementById('sms-message').value;
+  const msg = personalizeMessage(template, o);
+  window.location.href = buildSmsLink(o.phone, msg);
+});
+
+document.getElementById('sms-next').addEventListener('click', ()=>{
+  smsQueueIndex++;
+  renderSmsProgress();
+});
+
+document.getElementById('sms-cancel').addEventListener('click', ()=>{
+  smsQueue = [];
+  smsQueueIndex = 0;
+  document.getElementById('sms-progress').style.display = 'none';
+});
+
 function renderAdminStats(){
   const wrap = document.getElementById('admin-stats');
   if(!wrap) return;
@@ -1620,6 +2007,7 @@ let editingOrderId = null; // 수정 중인 주문의 id (없으면 null)
 function renderAdminOrders(){
   renderAdminStats();
   renderProductQtySummaries();
+  renderSmsRecipientList();
   const wrap = document.getElementById('admin-orders');
   const sourceList = adminSearchCriteria ? (findMatchingOrders(adminSearchCriteria) || []) : orders;
 
@@ -1859,6 +2247,8 @@ async function renderAdmin(skipReload){
 }
 
 // INIT
+renderBankInfo(); // Firebase 로딩 전에도 기본 계좌 정보가 먼저 보이도록
+renderNotice();
 (async function init(){
   await loadData();
   renderSlices();
