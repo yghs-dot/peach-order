@@ -603,6 +603,19 @@
           <button class="btn btn-primary" id="fix-label-btn" type="button">일괄 수정 적용</button>
           <div class="small-note" id="fix-label-msg"></div>
         </div>
+
+        <div class="card">
+          <h2>주문 가격 일괄 정정</h2>
+          <div class="sub">이미 접수된 주문에 저장된 단가를 한 번에 고칠 수 있어요. 상품명과 기존 단가가 정확히 일치하는 주문만 찾아서, 단가와 결제금액(단가×수량)을 새 가격으로 다시 계산해요. 상품 관리의 현재 판매가격도 함께 갱신돼요.</div>
+          <label class="field">상품명</label>
+          <input type="text" id="fix-price-label" placeholder="예: 11개입" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <label class="field">기존 단가 (원)</label>
+          <input type="number" id="fix-price-old" placeholder="예: 28000" min="0" step="100">
+          <label class="field">새 단가 (원)</label>
+          <input type="number" id="fix-price-new" placeholder="예: 30000" min="0" step="100">
+          <button class="btn btn-primary" id="fix-price-btn" type="button">일괄 수정 적용</button>
+          <div class="small-note" id="fix-price-msg"></div>
+        </div>
       </div>
 
       <div class="admin-subpanel" id="admin-sub-pw" style="display:none;">
@@ -1625,6 +1638,80 @@ document.getElementById('fix-label-btn').addEventListener('click', async ()=>{
   renderSlices();
   renderManualTypeOptions();
   toast(`주문 ${count}건이 수정되었습니다.`);
+});
+
+// 이미 접수된 주문에 저장된 단가(unitPrice)를 일괄로 찾아 바꾸고 결제금액도 재계산하는 도구
+document.getElementById('fix-price-btn').addEventListener('click', async ()=>{
+  const msg = document.getElementById('fix-price-msg');
+  const label = document.getElementById('fix-price-label').value.trim();
+  const oldPriceVal = document.getElementById('fix-price-old').value;
+  const newPriceVal = document.getElementById('fix-price-new').value;
+  const oldPrice = parseInt(oldPriceVal);
+  const newPrice = parseInt(newPriceVal);
+
+  if(!label){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '상품명을 입력해주세요.';
+    return;
+  }
+  if(oldPriceVal === '' || isNaN(oldPrice) || oldPrice < 0){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '기존 단가를 정확히 입력해주세요.';
+    return;
+  }
+  if(newPriceVal === '' || isNaN(newPrice) || newPrice < 0){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '새 단가를 정확히 입력해주세요.';
+    return;
+  }
+
+  const btn = document.getElementById('fix-price-btn');
+  btn.disabled = true;
+  btn.textContent = '수정 중...';
+
+  await loadOrdersOnly();
+  let count = 0;
+  orders.forEach(o=>{
+    if(o.label === label && o.unitPrice === oldPrice){
+      o.unitPrice = newPrice;
+      o.total = newPrice * o.qty;
+      count++;
+    }
+  });
+
+  if(count === 0){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = `상품명 "${label}", 단가 ${oldPrice.toLocaleString()}원과 정확히 일치하는 주문을 찾지 못했습니다.`;
+    btn.disabled = false;
+    btn.textContent = '일괄 수정 적용';
+    return;
+  }
+
+  await saveOrders();
+
+  // 상품 관리 목록에도 같은 이름+가격이 남아있다면 함께 정정
+  let productAlsoFixed = false;
+  PRODUCTS.forEach(p=>{
+    if(p.label === label && p.price === oldPrice){ p.price = newPrice; productAlsoFixed = true; }
+  });
+  if(productAlsoFixed){
+    config.products = PRODUCTS.map(p=>({...p}));
+    await saveConfig();
+  }
+
+  msg.style.color = 'var(--leaf-dark)';
+  msg.textContent = `주문 ${count}건의 "${label}" 단가를 ${oldPrice.toLocaleString()}원 → ${newPrice.toLocaleString()}원으로 수정했습니다.${productAlsoFixed ? ' (상품 목록의 판매가격도 함께 수정됨)' : ''}`;
+  document.getElementById('fix-price-label').value = '';
+  document.getElementById('fix-price-old').value = '';
+  document.getElementById('fix-price-new').value = '';
+  btn.disabled = false;
+  btn.textContent = '일괄 수정 적용';
+
+  renderAdminOrders();
+  renderAdminLimits();
+  renderSlices();
+  renderManualTypeOptions();
+  toast(`주문 ${count}건의 단가가 수정되었습니다.`);
 });
 
 document.getElementById('admin-search-btn').addEventListener('click', async ()=>{
