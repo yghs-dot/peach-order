@@ -502,6 +502,7 @@
         <div class="admin-tab tab" data-admin-tab="register">주문 등록</div>
         <div class="admin-tab tab" data-admin-tab="fix">데이터 정정</div>
         <div class="admin-tab tab" data-admin-tab="reset">데이터 초기화</div>
+        <div class="admin-tab tab" data-admin-tab="archive">지난 주문</div>
         <div class="admin-tab tab" data-admin-tab="pw">비밀번호</div>
         <div class="admin-tab tab" data-admin-tab="account">계좌 정보</div>
         <div class="admin-tab tab" data-admin-tab="sms">문자 발송</div>
@@ -658,17 +659,28 @@
       <div class="admin-subpanel" id="admin-sub-reset" style="display:none;">
         <div class="card">
           <h2>데이터 초기화</h2>
-          <div class="sub">지금까지 접수된 <b>모든 주문 정보를 완전히 삭제</b>해요. 새로운 판매 시즌을 시작할 때 사용하세요.</div>
-          <div class="notice" style="color:var(--danger);background:#FBEAE3;">
-            ⚠️ 이 작업은 되돌릴 수 없습니다. 초기화하기 전에 "주문 목록" 탭의 "엑셀 파일로 내려받기"로 먼저 백업해두는 것을 강력히 권장해요.
+          <div class="sub">초기화하면 지금까지의 주문을 <b>회차별로 보관</b>해두고, 새 주문을 받을 수 있도록 목록을 비워요. 보관된 회차는 "지난 주문" 탭에서 언제든 다시 볼 수 있어요.</div>
+          <div class="notice">
+            ⚠️ 초기화 후에는 지금 목록에 있는 주문이 "지난 주문" 탭으로 옮겨지고, 여기서는 더 이상 관리(수정·삭제·문자발송 등)할 수 없어요. 그래도 안전하게 "주문 목록" 탭의 엑셀 다운로드로 미리 백업해두는 걸 추천해요.
           </div>
           <div class="small-note" id="reset-order-count" style="margin-top:10px;"></div>
 
-          <label class="field" style="margin-top:16px;">아래 칸에 <b>초기화</b>라고 입력해주세요</label>
+          <label class="field" style="margin-top:16px;">보관할 회차 이름</label>
+          <input type="text" id="reset-round-label" placeholder="예: 1차 주문" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+          <label class="field" style="margin-top:14px;">아래 칸에 <b>초기화</b>라고 입력해주세요</label>
           <input type="text" id="reset-confirm-input" placeholder="초기화" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
-          <button class="btn" id="reset-orders-btn" type="button" style="margin-top:14px;background:var(--danger);color:#fff;">모든 주문 정보 초기화하기</button>
+          <button class="btn" id="reset-orders-btn" type="button" style="margin-top:14px;background:var(--danger);color:#fff;">이번 회차 보관하고 초기화하기</button>
           <div class="small-note" id="reset-msg"></div>
+        </div>
+      </div>
+
+      <div class="admin-subpanel" id="admin-sub-archive" style="display:none;">
+        <div class="card">
+          <h2>지난 주문 (회차별 보관함)</h2>
+          <div class="sub">초기화할 때마다 그 시점의 주문이 회차별로 여기에 보관돼요. 읽기 전용이며, 회차별로 펼쳐서 확인하거나 엑셀로 내려받을 수 있어요.</div>
+          <div id="archive-list"></div>
         </div>
       </div>
 
@@ -800,6 +812,7 @@ try{
 const CONFIG_DOC = () => db.collection('peach').doc('config');
 const ORDERS_DOC = () => db.collection('peach').doc('orders');
 const ADMIN_DOC = () => db.collection('peach').doc('admin');
+const ARCHIVES_DOC = () => db.collection('peach').doc('archives');
 
 const DEFAULT_PRODUCTS = [
   {key:'10', label:'10개입', price:30000},
@@ -913,15 +926,19 @@ async function loadData(){
     document.getElementById('setup-banner').style.display = 'block';
     return;
   }
-  const [configResult, ordersResult] = await Promise.allSettled([
+  const [configResult, ordersResult, archivesResult] = await Promise.allSettled([
     CONFIG_DOC().get(),
-    ORDERS_DOC().get()
+    ORDERS_DOC().get(),
+    ARCHIVES_DOC().get()
   ]);
   if(configResult.status === 'fulfilled' && configResult.value.exists){
     config = configResult.value.data();
   }
   if(ordersResult.status === 'fulfilled' && ordersResult.value.exists){
     orders = ordersResult.value.data().list || [];
+  }
+  if(archivesResult.status === 'fulfilled' && archivesResult.value.exists){
+    archives = archivesResult.value.data().rounds || [];
   }
   syncProductsFromConfig();
   syncBankInfoFromConfig();
@@ -935,6 +952,23 @@ async function loadOrdersOnly(){
     const o = await ORDERS_DOC().get();
     if(o.exists) orders = o.data().list || [];
   }catch(e){ console.error(e); }
+}
+
+let archives = []; // [{label, archivedAt, orders:[...]}]
+
+async function loadArchives(){
+  if(!firebaseReady) return;
+  try{
+    const a = await ARCHIVES_DOC().get();
+    if(a.exists) archives = a.data().rounds || [];
+  }catch(e){ console.error(e); }
+}
+
+async function saveArchives(){
+  if(!firebaseReady){ toast('Firebase 설정이 필요합니다.'); return; }
+  try{
+    await ARCHIVES_DOC().set({ rounds: archives });
+  }catch(e){ toast('저장 중 오류가 발생했습니다.'); }
 }
 
 // 검색된 주문 목록을 상품별 갯수 / 입금 상태 / 전달 상태로 요약
@@ -1787,17 +1821,89 @@ document.getElementById('fix-price-btn').addEventListener('click', async ()=>{
 // ===== 데이터 초기화 =====
 function renderResetInfo(){
   const el = document.getElementById('reset-order-count');
-  if(!el) return;
-  el.textContent = `현재 저장된 주문: 총 ${orders.length}건`;
+  if(el) el.textContent = `현재 저장된 주문: 총 ${orders.length}건`;
+
+  const labelInput = document.getElementById('reset-round-label');
+  if(labelInput && !labelInput.value.trim()){
+    labelInput.value = `${archives.length + 1}차 주문`;
+  }
+}
+
+function archiveRowHTML(round, index){
+  const list = round.orders || [];
+  const totalQty = list.reduce((s,o)=>s+o.qty,0);
+  const totalAmount = list.reduce((s,o)=>s+o.total,0);
+  const dateStr = round.archivedAt ? new Date(round.archivedAt).toLocaleString('ko-KR') : '';
+  return `
+    <div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div style="font-weight:800;font-size:16px;">${round.label || (index+1)+'차 주문'}</div>
+          <div style="font-size:12.5px;color:var(--ink-soft);">보관일시: ${dateStr} · 총 ${list.length}건 · ${totalQty}개 · ${totalAmount.toLocaleString()}원</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-outline btn-small" data-index="${index}" data-action="archive-toggle" type="button">펼쳐보기</button>
+          <button class="btn btn-outline btn-small" data-index="${index}" data-action="archive-excel" type="button">엑셀 다운로드</button>
+        </div>
+      </div>
+      <div id="archive-detail-${index}" style="display:none;margin-top:14px;"></div>
+    </div>
+  `;
+}
+
+function renderArchiveList(){
+  const wrap = document.getElementById('archive-list');
+  if(!wrap) return;
+  if(archives.length === 0){
+    wrap.innerHTML = '<div class="empty">아직 보관된 지난 회차가 없습니다. "데이터 초기화" 탭에서 초기화하면 이곳에 자동으로 보관돼요.</div>';
+    return;
+  }
+  // 최신 회차가 위로 오도록 정렬
+  const indexed = archives.map((round, idx)=>({round, idx}));
+  indexed.sort((a,b)=> new Date(b.round.archivedAt||0) - new Date(a.round.archivedAt||0));
+
+  wrap.innerHTML = indexed.map(({round, idx})=> archiveRowHTML(round, idx)).join('');
+
+  wrap.querySelectorAll('button[data-action="archive-toggle"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = btn.dataset.index;
+      const detail = document.getElementById('archive-detail-'+idx);
+      const round = archives[idx];
+      if(!round) return;
+      if(detail.style.display === 'none'){
+        detail.innerHTML = renderSummaryBox(round.orders || []) + renderOrderListHTML(round.orders || [], true);
+        detail.style.display = 'block';
+        btn.textContent = '접기';
+      }else{
+        detail.style.display = 'none';
+        btn.textContent = '펼쳐보기';
+      }
+    });
+  });
+
+  wrap.querySelectorAll('button[data-action="archive-excel"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = btn.dataset.index;
+      const round = archives[idx];
+      if(!round) return;
+      exportOrdersToExcel(round.orders || [], round.label || `${parseInt(idx)+1}차_주문`);
+    });
+  });
 }
 
 document.getElementById('reset-orders-btn').addEventListener('click', async ()=>{
   const msg = document.getElementById('reset-msg');
   const confirmInput = document.getElementById('reset-confirm-input').value.trim();
+  const roundLabel = document.getElementById('reset-round-label').value.trim();
 
   if(confirmInput !== '초기화'){
     msg.style.color = 'var(--danger)';
     msg.textContent = '위 칸에 정확히 "초기화"라고 입력해주세요.';
+    return;
+  }
+  if(!roundLabel){
+    msg.style.color = 'var(--danger)';
+    msg.textContent = '보관할 회차 이름을 입력해주세요. (예: 1차 주문)';
     return;
   }
 
@@ -1810,26 +1916,38 @@ document.getElementById('reset-orders-btn').addEventListener('click', async ()=>
     return;
   }
 
-  const ok = confirm(`정말로 전체 주문 ${count}건을 모두 삭제하시겠어요?\n이 작업은 되돌릴 수 없습니다.`);
+  const ok = confirm(`"${roundLabel}"(으)로 현재 주문 ${count}건을 보관하고, 주문 목록을 비우시겠어요?\n보관된 내용은 "지난 주문" 탭에서 계속 볼 수 있어요.`);
   if(!ok) return;
 
   const btn = document.getElementById('reset-orders-btn');
   btn.disabled = true;
-  btn.textContent = '초기화 중...';
+  btn.textContent = '보관 및 초기화 중...';
 
+  // 1. 지금 주문을 회차로 보관
+  await loadArchives();
+  archives.push({
+    label: roundLabel,
+    archivedAt: new Date().toISOString(),
+    orders: orders.map(o=>({...o})),
+  });
+  await saveArchives();
+
+  // 2. 실제 주문 목록은 비움
   orders = [];
   await saveOrders();
 
   msg.style.color = 'var(--leaf-dark)';
-  msg.textContent = `주문 ${count}건이 모두 삭제되었습니다.`;
+  msg.textContent = `"${roundLabel}"(으)로 주문 ${count}건을 보관하고 초기화했습니다. "지난 주문" 탭에서 확인할 수 있어요.`;
   document.getElementById('reset-confirm-input').value = '';
+  document.getElementById('reset-round-label').value = '';
   btn.disabled = false;
-  btn.textContent = '모든 주문 정보 초기화하기';
+  btn.textContent = '이번 회차 보관하고 초기화하기';
 
   adminSearchCriteria = null;
   renderAdminOrders();
+  renderArchiveList();
   renderSlices();
-  toast('주문 데이터가 초기화되었습니다.');
+  toast(`"${roundLabel}"(으)로 보관 후 초기화되었습니다.`);
 });
 
 document.getElementById('admin-search-btn').addEventListener('click', async ()=>{
@@ -1868,20 +1986,12 @@ document.getElementById('admin-search-ho').addEventListener('input', (e)=>{
   e.target.value = e.target.value.replace(/\D/g,'').slice(0,4);
 });
 
-document.getElementById('export-excel').addEventListener('click', async ()=>{
-  const btn = document.getElementById('export-excel');
-  btn.disabled = true;
-  btn.textContent = '만드는 중...';
-  await loadOrdersOnly();
-
-  if(orders.length === 0){
+function exportOrdersToExcel(list, filenamePrefix){
+  if(!list || list.length === 0){
     toast('내려받을 주문이 없습니다.');
-    btn.disabled = false;
-    btn.textContent = '📊 엑셀 파일로 내려받기';
     return;
   }
-
-  const sorted = [...orders].sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
+  const sorted = [...list].sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
   const rows = sorted.map(o=>({
     '주문번호': o.id,
     '이름': o.name || '',
@@ -1907,7 +2017,17 @@ document.getElementById('export-excel').addEventListener('click', async ()=>{
   XLSX.utils.book_append_sheet(wb, ws, '주문목록');
 
   const today = new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb, `복숭아주문목록_${today}.xlsx`);
+  const safePrefix = (filenamePrefix || '복숭아주문목록').replace(/[\\/:*?"<>|]/g, '_');
+  XLSX.writeFile(wb, `${safePrefix}_${today}.xlsx`);
+}
+
+document.getElementById('export-excel').addEventListener('click', async ()=>{
+  const btn = document.getElementById('export-excel');
+  btn.disabled = true;
+  btn.textContent = '만드는 중...';
+  await loadOrdersOnly();
+
+  exportOrdersToExcel(orders, '복숭아주문목록');
 
   btn.disabled = false;
   btn.textContent = '📊 엑셀 파일로 내려받기';
@@ -2450,6 +2570,8 @@ async function renderAdmin(skipReload){
   renderAdminLimits();
   renderAdminOrders();
   renderManualTypeOptions();
+  renderArchiveList();
+  renderResetInfo();
 }
 
 // INIT
