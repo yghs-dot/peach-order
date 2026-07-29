@@ -2,7 +2,13 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="복숭아 주문">
+<meta name="theme-color" content="#FCF3E7">
+<meta name="format-detection" content="telephone=no">
 <title>복숭아 주문</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -24,21 +30,22 @@
     --danger: #C1503B;
     --radius: 18px;
   }
-  *{box-sizing:border-box;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   body{
     margin:0;
     background: var(--bg);
     color: var(--ink);
     font-family:'Noto Sans KR', sans-serif;
     line-height:1.6;
-    padding-bottom:60px;
+    padding-bottom:calc(60px + env(safe-area-inset-bottom));
   }
   .wrap{max-width:720px;margin:0 auto;padding:0 20px;}
 
   /* HERO */
   .hero{
     position:relative;
-    padding:56px 20px 44px;
+    padding:calc(56px + env(safe-area-inset-top)) 20px 44px;
     text-align:center;
     overflow:hidden;
     background:
@@ -164,15 +171,17 @@
   }
 
   label.field{display:block;margin:14px 0 6px;font-weight:700;font-size:13.5px;color:var(--ink);}
-  input[type=text], input[type=tel], input[type=number], input[type=password], select{
+  input[type=text], input[type=tel], input[type=number], input[type=password], select, textarea{
     width:100%;
     padding:12px 14px;
     border:1.5px solid var(--line);
     border-radius:10px;
-    font-size:15px;
+    font-size:16px;
     font-family:inherit;
     background:#fff;
     color:var(--ink);
+    -webkit-appearance:none;
+    appearance:none;
   }
   input:focus{outline:2px solid var(--coral);outline-offset:1px;border-color:var(--coral);}
 
@@ -234,6 +243,8 @@
     cursor:pointer;
     margin-top:16px;
     transition:.15s;
+    -webkit-appearance:none;
+    appearance:none;
   }
   .btn-primary{background:var(--coral);color:#fff;}
   .btn-primary:hover{background:var(--coral-dark);}
@@ -330,6 +341,31 @@
 </style>
 </head>
 <body>
+
+<script>
+// 카카오톡 인앱 브라우저는 sms:/tel: 링크나 일부 기능이 제대로 동작하지 않아서,
+// 감지되면 즉시 외부 브라우저(사파리 등)로 열도록 안내합니다. (카카오 공식 지원 방식)
+(function(){
+  var ua = navigator.userAgent || '';
+  if(/KAKAOTALK/i.test(ua)){
+    location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+  }
+  // 카카오톡 외에 인스타그램/페이스북/라인/네이버 등 다른 인앱 브라우저는
+  // 외부 브라우저로 자동으로 열어주는 표준 방법이 없어서, 안내 배너만 보여줍니다.
+  var isOtherInApp = /FBAN|FBAV|Instagram|Line\/|NAVER\(|DaumApps/i.test(ua);
+  if(isOtherInApp){
+    document.addEventListener('DOMContentLoaded', function(){
+      var banner = document.getElementById('inapp-browser-banner');
+      if(banner) banner.style.display = 'block';
+    });
+  }
+})();
+</script>
+
+<div id="inapp-browser-banner" style="display:none;position:sticky;top:0;z-index:50;background:#3B2A22;color:#fff;padding:12px 16px;font-size:13px;text-align:center;line-height:1.5;">
+  카카오톡 등 앱 내 브라우저에서는 일부 기능(전화·문자 연결 등)이 제대로 동작하지 않을 수 있어요.<br>
+  오른쪽 위 <b>'···'</b> 메뉴에서 <b>'다른 브라우저로 열기' / 'Safari로 열기'</b>를 선택해주세요.
+</div>
 
 <div class="hero">
   <svg class="peach-mark" viewBox="0 0 64 64" fill="none">
@@ -484,7 +520,7 @@
           <h2>공지사항 관리</h2>
           <div class="sub">주문 화면 맨 위에 표시될 공지사항이에요. 비워두고 저장하면 공지가 화면에서 사라져요.</div>
           <label class="field">공지사항 내용</label>
-          <textarea id="notice-input" placeholder="예: 이번 주 배송은 금요일에 진행됩니다. 참고해주세요!" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;resize:vertical;min-height:120px;box-sizing:border-box;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+          <textarea id="notice-input" placeholder="예: 이번 주 배송은 금요일에 진행됩니다. 참고해주세요!" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;min-height:120px;box-sizing:border-box;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
           <div style="display:flex;gap:8px;margin-top:14px;">
             <button class="btn btn-primary" id="save-notice" style="flex:1;">공지사항 저장</button>
             <button class="btn btn-outline" id="delete-notice" style="flex:1;color:var(--danger);border-color:var(--danger);">공지사항 삭제</button>
@@ -654,7 +690,7 @@
           <div class="sub">주문자에게 안내 문자를 보낼 수 있어요. 브라우저 보안상 완전 자동 대량발송은 지원하지 않고, 아래에서 대상을 고른 뒤 한 분씩 문자 앱이 열리면 확인하고 보내는 방식이에요. 개별로 한 명씩 바로 보낼 수도 있어요.</div>
           <div class="notice">문구 안에 <b>{이름}</b> <b>{동}</b> <b>{호수}</b> <b>{상품}</b> <b>{수량}</b>을 넣으면 받는 사람마다 자동으로 바뀌어요. 아래 대상 목록에서 각 사람에게 실제로 어떤 문구가 가는지 미리 확인할 수 있어요.</div>
           <label class="field">문자 내용</label>
-          <textarea id="sms-message" placeholder="예: {이름}님, 주문하신 {상품} {수량}개 준비 완료되어 오늘 오후에 전달드릴 예정입니다. 감사합니다!" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;resize:vertical;min-height:100px;box-sizing:border-box;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+          <textarea id="sms-message" placeholder="예: {이름}님, 주문하신 {상품} {수량}개 준비 완료되어 오늘 오후에 전달드릴 예정입니다. 감사합니다!" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;min-height:100px;box-sizing:border-box;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
 
           <div style="display:flex;gap:8px;margin:14px 0;">
             <button class="btn btn-outline btn-small" id="sms-select-all" type="button" style="flex:1;">전체 선택</button>
@@ -1337,7 +1373,7 @@ function productRowHTML(key, label, price, limit){
   return `
     <div class="price-edit-row" data-key="${key}" style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line);">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
-        <input type="text" class="product-label-input" value="${label}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="font-weight:800;font-size:14.5px;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;flex:1;">
+        <input type="text" class="product-label-input" value="${label}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="font-weight:800;font-size:16px;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;flex:1;">
         <button class="btn btn-outline btn-small" data-delete-row type="button" style="color:var(--danger);border-color:var(--danger);white-space:nowrap;">삭제</button>
       </div>
       <div class="row2">
@@ -2135,7 +2171,7 @@ function renderAdminOrders(){
         <label class="field">연락처</label>
         <input type="tel" class="edit-phone" data-id="${o.id}" value="${o.phone || ''}" placeholder="010-1234-5678">
         <label class="field">비고</label>
-        <textarea class="edit-note-form" data-id="${o.id}" placeholder="특이사항을 입력하세요" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:13.5px;resize:vertical;min-height:60px;box-sizing:border-box;">${o.note || ''}</textarea>
+        <textarea class="edit-note-form" data-id="${o.id}" placeholder="특이사항을 입력하세요" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;min-height:60px;box-sizing:border-box;">${o.note || ''}</textarea>
         <div style="display:flex;gap:8px;margin-top:14px;">
           <button class="btn btn-primary btn-small" data-id="${o.id}" data-action="save-edit" style="flex:1;">저장</button>
           <button class="btn btn-outline btn-small" data-id="${o.id}" data-action="cancel-edit" style="flex:1;">취소</button>
@@ -2168,7 +2204,7 @@ function renderAdminOrders(){
         <span style="color:var(--ink-soft);font-size:12px;">${o.id} · ${new Date(o.createdAt).toLocaleString('ko-KR')}</span>
         <div style="margin-top:10px;">
           <span class="field-tag">비고</span>
-          <textarea class="edit-note" data-id="${o.id}" placeholder="특이사항을 입력하세요 (예: 문 앞에 놓아주세요, 부재중 연락 필요 등)" style="width:100%;margin-top:6px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:13.5px;resize:vertical;min-height:60px;box-sizing:border-box;">${o.note || ''}</textarea>
+          <textarea class="edit-note" data-id="${o.id}" placeholder="특이사항을 입력하세요 (예: 문 앞에 놓아주세요, 부재중 연락 필요 등)" style="width:100%;margin-top:6px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:16px;resize:vertical;min-height:60px;box-sizing:border-box;">${o.note || ''}</textarea>
           <button class="btn btn-outline btn-small" data-id="${o.id}" data-action="save-note" style="margin-top:6px;">메모 저장</button>
         </div>
       </div>
